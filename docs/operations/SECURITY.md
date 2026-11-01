@@ -1,0 +1,19 @@
+# Segurança para o laboratório
+
+## Modelo de ameaça
+Ataques de repetição de requisição, acesso a conta alheia, spoofing de callbacks, brute force, payload inválido, logs com dados sensíveis e transferências simultâneas. Mesmo sendo ambiente de estudo, não retirar validação de autorização dos casos de uso.
+
+## Regras
+1. Não confiar em `ownerId` no corpo da requisição; principal vem do contexto autenticado.
+2. Controllers validam formato; application/domain validam autorização e invariantes.
+3. Rotas `/v1/dev/**` só existem e estão habilitadas em `dev`/`test`; bloqueadas por configuração **e** controle de papel de teste.
+4. Segredos fora do repositório; `.env` local não versionado; exemplos em `.env.example` sem valores reais.
+5. JWT (fase posterior ao primeiro esqueleto) com expiração, issuer/audience e assinatura; autorização não fica apenas no Gateway futuro.
+6. Rate limit protege tráfego mas não substitui idempotência nem autorização.
+7. TLS para qualquer ambiente acessível por rede; credenciais DB específicas e mínimo privilégio.
+8. Não coletar PAN/CVV reais nem armazenar tokens de acesso em logs; payload de erro não expõe stack trace ou SQL.
+9. Webhook futuro com HMAC/timestamp, identificação do evento e política anti-replay.
+10. Auditoria estruturada com `requestId`, `actorId`, `operationId`, alteração de estado e sem dados secretos.
+
+## Limite da simulação
+API com dados financeiros reais e comunicação com sistema de pagamentos exigem requisitos regulatórios, operacionais e de segurança fora do escopo. Ambiente dev/test é obrigatoriamente isolado.
