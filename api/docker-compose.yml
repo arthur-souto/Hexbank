@@ -1,0 +1,15 @@
+services:
+  hexbank-database:
+    image: postgres:16-alpine
+    container_name: hexbank-db-container
+    environment:
+      POSTGRES_DB: hexbank_db
+      POSTGRES_USER: hex
+      POSTGRES_PASSWORD: hex
+    ports:
+      - "5433:5432"
+    volumes:
+      - hexbank-db-data:/var/lib/postgresql/data
+
+volumes:
+  hexbank-db-data:

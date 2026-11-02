@@ -1,0 +1,25 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: api
+
+# database configuration
+  datasource:
+    url: ${DATASOURCE_URL:jdbc:postgresql://localhost:5433/hexbank_db?sslmode=disable}
+    username: ${DATASOURCE_USERNAME:hex}
+    password: ${DATASOURCE_PASSWORD:hex}
+
+# jpa configuration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+
+# actuator configuration to expose the health endpoint
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
