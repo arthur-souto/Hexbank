@@ -58,11 +58,66 @@ A camada HTTP **não é um API Gateway independente**. No futuro um Gateway pode
 | [Roadmap](docs/implementation/ROADMAP.md) | sequência de implementação e critérios de pronto |
 | [ADR-0001](docs/adr/0001-modular-monolith.md) | decisão de monólito modular |
 
-## Stack inicial proposta
-Java 21 LTS; Spring Boot; Gradle; PostgreSQL; Flyway; JUnit 5; Testcontainers; ArchUnit; Docker Compose. Spring Modulith é **opcional** e depende de avaliar compatibilidade e benefício no setup. Versões exatas serão fixadas ao iniciar o projeto.
+## Stack
+- **Em uso (`api/pom.xml`):** Java 25 LTS; Spring Boot 4.1.2 (Web MVC, Data JPA, Security, Actuator); Maven (wrapper `./mvnw`); PostgreSQL 16 (Docker Compose); Flyway; springdoc-openapi 3.2.0; Lombok (fora do domínio); JUnit 5; Testcontainers; ArchUnit 1.4.1.
+- **CI:** GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw -B clean verify` em todo push na `main` e PR.
+- **Opcional:** Spring Modulith, se trouxer benefício além do ArchUnit.
 
 ## Execução
-Ainda **não há código de aplicação** neste pacote. Os comandos de execução serão adicionados assim que a Fase 0 produzir um projeto executável. Não afirmar que endpoints/testes funcionam antes de implementá-los.
+A aplicação fica em `api/`. **Fase 0 concluída:** esqueleto, segurança, erros padronizados e testes de arquitetura. Ainda **não há endpoints de domínio**. Pré-requisitos: JDK 25 e Docker.
+
+### Profiles
+| Profile | Uso | Identidade simulada | Swagger |
+|---|---|---|---|
+| *(nenhum)* | qualquer ambiente fora da máquina local | desligada (tudo exceto health = 401) | desligado |
+| `dev` | desenvolvimento local | `X-Dev-Principal` / `X-Dev-Roles` | `/swagger-ui.html` |
+| `test` | testes automatizados (Testcontainers) | ligada | só `/v3/api-docs` |
+
+### Comandos úteis
+```bash
+cd api
+
+# Infra
+docker compose up -d --wait            # PostgreSQL em localhost:5433 (db hexbank_db, user/senha hex)
+docker compose logs -f                 # logs do banco
+docker compose down                    # para (mantém dados)
+docker compose down -v                 # para e APAGA o volume (banco zerado)
+docker exec -it hexbank-db-container psql -U hex -d hexbank_db   # psql no banco local
+
+# Aplicação
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev   # API em http://localhost:8080 (profile dev)
+./mvnw spring-boot:test-run            # sobe com Postgres via Testcontainers (sem docker compose)
+
+# Testes e build
+./mvnw test                            # todos os testes (precisa do Docker ligado)
+./mvnw test -Dtest=ArchitectureTest    # só regras de arquitetura
+./mvnw test -Dtest=PhaseZeroAcceptanceTest
+./mvnw clean verify                    # o mesmo que o CI
+```
+
+### Testando a API (profile `dev`)
+```bash
+# Health (público)
+curl -s localhost:8080/actuator/health
+
+# Rota protegida sem identidade -> 401 problem+json
+curl -i localhost:8080/v1/accounts
+
+# Identidade simulada: qualquer UUID vira o principal
+curl -i -H "X-Dev-Principal: $(uuidgen)" -H "X-Request-Id: meu-teste-1" localhost:8080/v1/accounts
+
+# Rotas /v1/dev/** exigem papel TEST_ADMIN
+curl -i -H "X-Dev-Principal: $(uuidgen)" -H "X-Dev-Roles: TEST_ADMIN" localhost:8080/v1/dev/funding
+
+# Actuator extra no dev (exige principal): flyway, mappings, info
+curl -s -H "X-Dev-Principal: $(uuidgen)" localhost:8080/actuator/flyway
+```
+- **Swagger UI:** http://localhost:8080/swagger-ui.html → botão *Authorize* → informe um UUID em `devPrincipal` (e `TEST_ADMIN` em `devRoles` para rotas `/v1/dev/**`). Contrato JSON em `/v3/api-docs`.
+- **Configuração:** `application.yaml` (base), `application-dev.yaml`, `application-test.yaml`. Variáveis: `SERVER_PORT`, `DATASOURCE_URL`, `DATASOURCE_USERNAME`, `DATASOURCE_PASSWORD` (exemplo em `api/.env.example`).
+- **Migrations:** `api/src/main/resources/db/migration` (`V<n>__descricao.sql`; nunca editar migration já aplicada).
+- **Erros:** toda resposta de erro é `application/problem+json` com `code` e `requestId` (ver [Contratos HTTP](docs/contracts/HTTP_API.md)).
+
+Não afirmar que endpoints/testes de domínio funcionam antes de implementá-los.
 
 ## Convenções de documentação
 - Mudanças de contratos precisam alterar os documentos e testes correspondentes.

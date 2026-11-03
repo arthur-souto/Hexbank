@@ -1,5 +1,7 @@
 package com.hexbank;
 
+import com.hexbank.bootstrap.ApiApplication;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Sem profile dev/test (como em qualquer ambiente "real"): identidade simulada e Swagger NÃO existem.
  * Garante que esquecer o profile não abre a API.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(classes = ApiApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestContainersConfiguration.class)
 class DefaultProfileSecurityTest {
 

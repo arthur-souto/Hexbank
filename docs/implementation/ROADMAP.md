@@ -2,21 +2,37 @@
 
 Cada fase depende da anterior; os critérios de pronto são verificáveis. **Não são estimativas de duração.** Em toda fase: atualizar testes, README e ADRs.
 
-## Fase 0 — Fundação e fronteiras
-- [ ] Gerar projeto Java 21 + Spring Boot + Gradle.
-- [ ] Definir módulos (`accounts`, `ledger`, `transfers`, `funding`, etc.) com camadas hexagonais.
-- [ ] Configurar PostgreSQL via Docker Compose, Flyway, perfil test, Testcontainers, JUnit 5, ArchUnit.
-- [ ] Criar health endpoint e tratamento padronizado de erro.
-- [ ] Implementar identidade simulada só para testes locais, com contrato de principal e autorização desde o início.
-- [ ] Formalizar ADR-0001; escrever teste que proíbe dependências ilegais.
+## Fase 0 — Fundação e fronteiras ✅ concluída (2026-11-03)
+- [x] Gerar projeto Java 25 + Spring Boot 4.1 + Maven.
+- [x] Definir módulos (`identity`, `accounts`, `ledger`, `transfers`, `funding`, `shared`) com camadas hexagonais (pacotes + `package-info`).
+- [x] Configurar PostgreSQL via Docker Compose (com healthcheck), Flyway (`V1__baseline` cria schemas por módulo), profiles `dev`/`test`, Testcontainers, JUnit 5, ArchUnit.
+- [x] Health endpoint público e tratamento padronizado de erro (`problem+json` com `code` e `requestId`, inclusive 401/403 do Spring Security).
+- [x] `X-Request-Id` ecoado/gerado e propagado ao MDC dos logs.
+- [x] Identidade simulada só em `dev`/`test` (`X-Dev-Principal`, `X-Dev-Roles`), `PrincipalId` de domínio, `/v1/dev/**` exige `TEST_ADMIN`; sem profile tudo é 401.
+- [x] Swagger/OpenAPI só em `dev`/`test`, com esquema de segurança da identidade simulada.
+- [x] ADR-0001 formalizado; `ArchitectureTest` proíbe framework no domínio, ciclos entre módulos, inversão de camadas e acesso fora da API pública de outro módulo.
+- [x] CI (GitHub Actions) com `./mvnw clean verify`.
+
 **Pronto quando:** aplicação sobe, migration executa, smoke test e teste arquitetural passam.
+**Evidência:** `PhaseZeroAcceptanceTest`, `DefaultProfileSecurityTest`, `ArchitectureTest`, `ApiApplicationTests` (17 testes verdes).
+
+### Pendências conscientes herdadas para a Fase 1
+- `ApiApplication` vive em `com.hexbank.bootstrap` com scan explícito de `com.hexbank` (componentes, entidades e repositórios); todo `@SpringBootTest` declara `classes = ApiApplication.class`.
+- Pacote `com.hexbank.api` está vazio e não consta no ARCHITECTURE.md: definir propósito ou remover.
+- Controller de identidade (`GET /v1/me`) ainda não existe; resolver o principal nos controllers via `@AuthenticationPrincipal PrincipalId`.
+- Ainda não há tratamento de `MethodArgumentNotValidException` com lista de campos: adicionar junto do primeiro DTO com Bean Validation (`spring-boot-starter-validation`).
 
 ## Fase 1 — Contas + Ledger + funding fictício
-- [ ] Implementar `Money`, Account, LedgerAccount, Journal, JournalEntry e convenção débito/crédito.
-- [ ] Projetar schema/constraints e contas de contrapartida.
-- [ ] Criar conta, consultar conta/saldo, lançar funding exclusivo de dev/test.
+- [ ] Registrar **ADR-0002 (convenção contábil)** antes do código: natureza das contas (ativo/passivo), sinal de débito/crédito, contas de contrapartida do funding.
+- [ ] Implementar `Money` (moeda + `long` minorUnits, `Math.addExact`/`subtractExact`) e testes puros de propriedade.
+- [ ] Implementar Account, LedgerAccount, Journal, JournalEntry no `domain` sem Spring/JPA (ArchUnit já bloqueia).
+- [ ] Migrations `V2__accounts.sql`, `V3__ledger.sql` nos schemas `accounts`/`ledger` com CHECKs, FKs e bloqueio de UPDATE/DELETE em entries (trigger ou permissão).
+- [ ] Adaptadores `adapter/out/persistence` (JPA ou JDBC) separados das entidades de domínio.
+- [ ] Endpoints `POST /v1/accounts`, `GET /v1/accounts/{id}`, `GET /v1/accounts/{id}/balance` com owner vindo do `PrincipalId`.
+- [ ] `POST /v1/dev/funding` com `@Profile({"dev","test"})` no controller **e** `TEST_ADMIN` (já exigido em `SecurityConfig`).
 - [ ] Materializar projeção de saldo na mesma transação dos entries.
-- [ ] Registrar ADR-0002 e invariantes em testes puros + Postgres.
+- [ ] Novos `code`s em `ErrorCodes` (`ACCOUNT_NOT_FOUND`, `ACCOUNT_NOT_ACTIVE`) + documentação no Swagger (`@Operation`, `@ApiResponse`).
+- [ ] Testes: unitários de domínio, `@WebMvcTest` + `spring-security-test` para contrato HTTP, integração Postgres para invariantes.
 **Pronto quando:** totais contábeis fecham e projeção coincide com entries; funding tem contrapartida.
 
 ## Fase 2 — Transferência interna confiável
@@ -62,4 +78,4 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 - [ ] Fazer simulações de entrevista e registrar trade-offs.
 
 ## Próxima tarefa concreta
-**Implementar SOMENTE a Fase 0.** Nenhum endpoint financeiro antes de congelar a convenção contábil e as regras de idempotência. Não antecipar Redis/Kafka/gateway externo.
+**Iniciar a Fase 1 pelo ADR-0002 (convenção contábil) e por `Money` com testes puros.** Nenhum endpoint financeiro antes de congelar a convenção contábil. Idempotência fica para a Fase 2. Não antecipar Redis/Kafka/gateway externo.

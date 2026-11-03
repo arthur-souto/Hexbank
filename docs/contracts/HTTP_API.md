@@ -1,10 +1,23 @@
 # Contratos HTTP — versão planejada v1
 
-**Status: PROPOSTO, ainda não implementado.** Base `/v1`. JSON UTF-8. Datas RFC 3339 em UTC. IDs UUID. `Money` representado como `{ "currency": "BRL", "minorUnits": 10000 }` (R$ 100,00). Não aceitar float para valores.
+**Status:** convenções transversais **implementadas na Fase 0** (autenticação simulada, `X-Request-Id`, formato de erro). Endpoints de domínio ainda **PROPOSTOS**. Base `/v1`. JSON UTF-8. Datas RFC 3339 em UTC. IDs UUID. `Money` representado como `{ "currency": "BRL", "minorUnits": 10000 }` (R$ 100,00). Não aceitar float para valores.
+
+OpenAPI gerado pelo springdoc em `dev`/`test`: `/v3/api-docs` (JSON) e `/swagger-ui.html` (só `dev`). Desligado sem profile.
+
+## Implementado na Fase 0
+| Item | Comportamento |
+|---|---|
+| `GET /actuator/health` | público, `200 {"status":"UP"}` |
+| Autenticação simulada (`dev`/`test`) | `X-Dev-Principal: <uuid>` autentica; `X-Dev-Roles: A,B` vira `ROLE_A`, `ROLE_B`. Ausente ou UUID inválido = anônimo |
+| Sem profile `dev`/`test` | filtro não existe; toda rota exceto health retorna 401 |
+| `/v1/dev/**` | exige `ROLE_TEST_ADMIN`, senão 403 `FORBIDDEN` |
+| Demais rotas | exigem autenticação, senão 401 `UNAUTHENTICATED` |
+| Rota inexistente (autenticado) | 404 `NOT_FOUND` |
+| `X-Request-Id` | aceito se `[A-Za-z0-9._:-]{1,128}`, senão substituído por UUID; sempre devolvido e presente no log (MDC) e no corpo de erro |
 
 ## Convenções
-- `Authorization: Bearer <token>` obrigatório quando autenticação real estiver habilitada; testes locais podem usar principal fake controlado exclusivamente pelo profile `test`.
-- `X-Request-Id` opcional do cliente; servidor gera se ausente, ecoa no retorno.
+- `Authorization: Bearer <token>` obrigatório quando autenticação real (JWT) estiver habilitada; até lá, só a identidade simulada acima, restrita a `dev`/`test`.
+- `X-Request-Id` opcional do cliente; servidor gera se ausente ou inválido, ecoa no retorno.
 - `Idempotency-Key` string opaca obrigatória em POST financeiro; tamanho de 16 a 128 caracteres (proposta).
 - Resposta de erro usa `application/problem+json` com `type`, `title`, `status`, `detail`, `instance`, `code`, `requestId`.
 - Paginação de extrato será por cursor opaco. Não confiar em campos `ownerId` enviados pelo cliente.
@@ -60,6 +73,9 @@ O endpoint gera journal balanceado com contrapartida institucional; não é dep�
 | 400 | `INVALID_REQUEST` | contrato ou valor inválido |
 | 401 | `UNAUTHENTICATED` | falta autenticação |
 | 403 | `FORBIDDEN` | sem permissão |
+| 404 | `NOT_FOUND` | rota/recurso genérico inexistente (Fase 0) |
+| 405 | `METHOD_NOT_ALLOWED` | método HTTP não suportado (Fase 0) |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | `Content-Type` não suportado (Fase 0) |
 | 404 | `ACCOUNT_NOT_FOUND` | conta inexistente ou ocultada por política de privacidade |
 | 409 | `INSUFFICIENT_FUNDS` | saldo disponível insuficiente |
 | 409 | `ACCOUNT_NOT_ACTIVE` | conta não pode movimentar |

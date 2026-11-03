@@ -8,6 +8,18 @@
 - **Contrato:** HTTP (`MockMvc` ou similar) e eventos versionados.
 - **Sistema:** k6, cenários de falha e reconciliadores em Docker Compose quando existentes.
 
+## Testes existentes (Fase 0)
+| Classe | Tipo | Cobre |
+|---|---|---|
+| `ArchitectureTest` | ArchUnit | domínio sem Spring/JPA/Hibernate/Lombok; módulos sem ciclos; `adapter -> application -> domain`; outro módulo só via `application.port.in` ou `domain` |
+| `PhaseZeroAcceptanceTest` | integração (Testcontainers, profile `test`) | migrations criam schemas; health público; 401/403/404 em `problem+json`; principal inválido = anônimo; `X-Request-Id`; OpenAPI publicado |
+| `DefaultProfileSecurityTest` | integração (sem profile) | header dev ignorado; Swagger desligado; health funciona |
+| `ApiApplicationTests` | smoke | contexto sobe |
+
+Infra de teste: `TestContainersConfiguration` (Postgres 16 via `@ServiceConnection`) e `TestApiApplication` (`./mvnw spring-boot:test-run`). Todo teste de integração exige Docker ligado.
+
+Convenções para próximas fases: domínio em testes puros sem Spring; contrato HTTP com `@WebMvcTest` + `spring-security-test`; invariantes contábeis e concorrência sempre contra Postgres real (nunca H2).
+
 ## Aceitação mínima por fase
 | Fase | Teste obrigatório |
 |---|---|
