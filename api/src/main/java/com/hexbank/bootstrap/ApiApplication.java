@@ -1,4 +1,4 @@
-package com.hexbank.api;
+package com.hexbank.bootstrap;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

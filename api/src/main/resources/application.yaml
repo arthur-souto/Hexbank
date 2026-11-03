@@ -4,22 +4,30 @@ server:
 spring:
   application:
     name: api
-
-# database configuration
   datasource:
     url: ${DATASOURCE_URL:jdbc:postgresql://localhost:5433/hexbank_db?sslmode=disable}
     username: ${DATASOURCE_USERNAME:hex}
     password: ${DATASOURCE_PASSWORD:hex}
-
-# jpa configuration
   jpa:
+    open-in-view: false     # sem lazy loading escondido na camada HTTP
     hibernate:
-      ddl-auto: validate
-    show-sql: true
+      ddl-auto: validate    # schema é do Flyway, nunca do Hibernate
+    show-sql: false         # ligado só no profile dev
 
-# actuator configuration to expose the health endpoint
 management:
   endpoints:
     web:
       exposure:
         include: health
+
+# OpenAPI/Swagger desligado por padrão; ligado só em dev/test (ver application-dev.yaml / application-test.yaml).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+  paths-to-match: /v1/**
+
+logging:
+  pattern:
+    level: "%5p [%X{requestId:-}]"   # requestId em toda linha de log

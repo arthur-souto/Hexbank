@@ -1,0 +1,7 @@
+# Profile usado pelos testes (@ActiveProfiles("test")). Datasource vem do Testcontainers (@ServiceConnection).
+# Habilita identidade simulada e o contrato OpenAPI para testes de contrato.
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: false

@@ -31,3 +31,16 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+# Maven
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+
+# ambiente local
+.env
+.envrc

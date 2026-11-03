@@ -1,15 +1,21 @@
+# Infra local. Fase 0: apenas PostgreSQL. Broker/Redis/simulador entram nas fases 3+.
 services:
   hexbank-database:
     image: postgres:16-alpine
     container_name: hexbank-db-container
     environment:
-      POSTGRES_DB: hexbank_db
-      POSTGRES_USER: hex
-      POSTGRES_PASSWORD: hex
+      POSTGRES_DB: ${POSTGRES_DB:-hexbank_db}
+      POSTGRES_USER: ${POSTGRES_USER:-hex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hex}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - hexbank-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   hexbank-db-data:
