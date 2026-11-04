@@ -87,8 +87,13 @@ Em `V2__accounts.sql`:
 - `closed_at TIMESTAMPTZ NULL` com `CHECK ((status = 'CLOSED') = (closed_at IS NOT NULL))`.
 - Nenhum `DELETE` em `accounts.accounts` nem em `ledger.ledger_accounts` pela aplicação.
 
-A `ledger_account` não tem status próprio: o status vive só em `accounts` (um único lugar de verdade). O ledger
-consulta o status pela porta pública do módulo `accounts` antes de lançar.
+A `ledger_account` não tem status próprio: o status vive só em `accounts` (um único lugar de verdade).
+
+**Direção da dependência (emenda de 2026-11-04):** `accounts → ledger`, nunca o contrário. A abertura de conta cria a
+`ledger_account` e o encerramento consulta o saldo pela porta pública do ledger; se o ledger também consultasse
+`accounts`, haveria ciclo entre módulos (reprovado pelo `ArchitectureTest`). Por isso **quem verifica o status é o
+caso de uso que orquestra o lançamento** (`funding`, depois `transfers`), via porta pública de `accounts`, na mesma
+transação do lançamento. O ledger não conhece status de conta.
 
 Toda mudança de status gera registro de auditoria com `from_status`/`to_status`, ator e motivo (BR-050, ADR-0004).
 
@@ -119,8 +124,8 @@ Toda mudança de status gera registro de auditoria com `from_status`/`to_status`
 - ✅ Recusas são determinísticas e mapeadas para códigos estáveis.
 - ✅ Schema da `V2` já nasce com os três status, sem migração futura de enum.
 - ⚠️ O cliente precisa esvaziar a conta antes de encerrar (passo extra de UX).
-- ⚠️ Ledger depende de consultar o status em `accounts` antes de lançar; a checagem precisa estar na mesma
-  transação para não haver corrida.
+- ⚠️ Todo caso de uso que lança no ledger (`funding`, `transfers`) precisa checar o status em `accounts` antes;
+  a checagem precisa estar na mesma transação para não haver corrida.
 - ⚠️ Novos códigos de erro: `ACCOUNT_NOT_ACTIVE`, `ACCOUNT_HAS_BALANCE`, `ACCOUNT_HAS_ACTIVE_HOLDS`,
   `INVALID_STATUS_TRANSITION` (documentar em `HTTP_API.md` quando expostos).
 

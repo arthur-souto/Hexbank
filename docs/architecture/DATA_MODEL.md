@@ -6,7 +6,7 @@
 | Tabela | Módulo | Colunas essenciais e restrições |
 |---|---|---|
 | `accounts` | accounts | `id PK`, `owner_id`, `currency`, `status`, `created_at`; index por owner |
-| `ledger_accounts` | ledger | `id PK`, `account_id` opcional, `currency`, `type`, `normal_balance`; unique para relação com conta do cliente |
+| `ledger_accounts` | ledger | `id PK`, `account_id` opcional (UNIQUE), `code` opcional (UNIQUE, contas institucionais), `currency`, `type`, `normal_balance`; `CHECK` exatamente um entre `account_id` e `code` ([ADR-0002](../adr/0002-convencao-contabil.md)) |
 | `journals` | ledger | `id PK`, `reference_type`, `reference_id`, `created_at`, `reversal_of` opcional; unique contra duplicação de journal por referência |
 | `journal_entries` | ledger | `id PK`, `journal_id FK`, `ledger_account_id FK`, `side` (DEBIT/CREDIT), `minor_units > 0`, `currency`; imutáveis |
 | `balance_projections` | ledger | `ledger_account_id PK`, `booked_minor_units`, `reserved_minor_units`, `version`; atualização transacional |
