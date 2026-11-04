@@ -1,7 +1,9 @@
-package com.hexbank.account.domain.exceptions;
+package com.hexbank.accounts.domain.exceptions;
 
-public class AccountNotActiveException extends RuntimeException {
-  public AccountNotActiveException(String message) {
-    super(message);
-  }
+import com.hexbank.shared.domain.exceptions.base.BusinessException;
+
+public class AccountNotActiveException extends BusinessException {
+    public AccountNotActiveException(String message) {
+        super(message);
+    }
 }

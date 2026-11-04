@@ -1,7 +1,9 @@
-package com.hexbank.account.domain.exceptions;
+package com.hexbank.accounts.domain.exceptions;
 
-public class InvalidStatusTransitionException extends RuntimeException {
-  public InvalidStatusTransitionException(String message) {
-    super(message);
-  }
+import com.hexbank.shared.domain.exceptions.base.BusinessException;
+
+public class InvalidStatusTransitionException extends BusinessException {
+    public InvalidStatusTransitionException(String message) {
+        super(message);
+    }
 }

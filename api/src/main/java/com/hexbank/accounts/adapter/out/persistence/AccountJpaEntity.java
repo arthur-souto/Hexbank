@@ -1,13 +1,15 @@
-package com.hexbank.account.adapter.out.persistence;
+package com.hexbank.accounts.adapter.out.persistence;
 
 import jakarta.persistence.*;
+import lombok.Getter;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
+@Getter
 @Table(schema = "accounts", name = "accounts")
-public class AccountJpaRepository {
+public class AccountJpaEntity {
 
     @Id
     private UUID id;
@@ -30,5 +32,21 @@ public class AccountJpaRepository {
     @Version
     private long version;
 
+    AccountJpaEntity update(String status, Instant closedAt) {
+        this.status = status;
+        this.closedAt = closedAt;
+        return this;
+    }
+
+    protected AccountJpaEntity() { }
+
+    AccountJpaEntity(UUID id, UUID ownerId, String currency, String status, Instant createdAt, Instant closedAt) {
+        this.id = id;
+        this.ownerId = ownerId;
+        this.currency = currency;
+        this.status = status;
+        this.createdAt = createdAt;
+        this.closedAt = closedAt;
+    }
 }
 
