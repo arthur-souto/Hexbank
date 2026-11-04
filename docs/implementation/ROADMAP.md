@@ -25,7 +25,7 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 ## Fase 1 — Contas + Ledger + funding fictício
 - [x] Registrar **ADR-0002 (convenção contábil)** antes do código ([`docs/adr/0002-convencao-contabil.md`](../adr/0002-convencao-contabil.md), status: aceito): natureza das contas (ativo/passivo), sinal de débito/crédito, contas de contrapartida do funding.
 - [x] Registrar **ADR-0003 (ciclo de vida e encerramento de contas)** ([`docs/adr/0003-ciclo-de-vida-e-encerramento-de-contas.md`](../adr/0003-ciclo-de-vida-e-encerramento-de-contas.md), status: aceito) e **ADR-0004 (retenção de auditoria)** ([`docs/adr/0004-retencao-de-auditoria.md`](../adr/0004-retencao-de-auditoria.md), status: aceito).
-- [ ] Implementar `Money` e `Currency` em `shared/domain` (shared kernel) seguindo a [especificação do `Money`](../architecture/ARCHITECTURE.md#money--o-que-deve-fazer-e-respeitar) e a [BR-001](../domain/BUSINESS_RULES.md#dinheiro-e-contas), com testes puros de propriedade; regra ArchUnit: `shared` não depende de módulos.
+- [x] Implementar `Money` e `Currency` (`InstanceCurrency`) em `shared/domain` (shared kernel) seguindo a [especificação do `Money`](../architecture/ARCHITECTURE.md#money--o-que-deve-fazer-e-respeitar) e a [BR-001](../domain/BUSINESS_RULES.md#dinheiro-e-contas), com testes puros de propriedade; regra ArchUnit: `shared` não depende de módulos.
 - [ ] Implementar Account, LedgerAccount, Journal, JournalEntry no `domain` sem Spring/JPA (ArchUnit já bloqueia).
 - [ ] Migrations `V2__accounts.sql`, `V3__ledger.sql` nos schemas `accounts`/`ledger` com CHECKs, FKs e bloqueio de UPDATE/DELETE em entries (trigger ou permissão).
 - [ ] Adaptadores `adapter/out/persistence` (JPA ou JDBC) separados das entidades de domínio.
@@ -81,4 +81,4 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 - [ ] Fazer simulações de entrevista e registrar trade-offs.
 
 ## Próxima tarefa concreta
-**Seguir a Fase 1 por `Money` com testes puros** (ADRs 0002–0004 aceitos). Nenhum endpoint financeiro antes de congelar a convenção contábil. Deduplicação idempotente fica para a Fase 2 (na Fase 1 o funding só valida a presença da `Idempotency-Key`). Não antecipar Redis/Kafka/gateway externo.
+**Seguir a Fase 1 pelo domínio: `Account`, `LedgerAccount`, `Journal` e `JournalEntry` com testes puros** (ADRs 0002–0004 aceitos; `Money` concluído). Nenhum endpoint financeiro antes de congelar a convenção contábil. Deduplicação idempotente fica para a Fase 2 (na Fase 1 o funding só valida a presença da `Idempotency-Key`). Não antecipar Redis/Kafka/gateway externo.

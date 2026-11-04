@@ -31,7 +31,7 @@ com.hexbank
   ledger/...
   transfers/...
   shared/
-    domain/                   # shared kernel mínimo: Money, Currency
+    domain/                   # shared kernel mínimo: Money, InstanceCurrency
     adapter/in/http/          # tipos técnicos comuns (erro problem+json, request id)
   bootstrap/                  # aplicação e wiring
 ```
@@ -39,12 +39,12 @@ com.hexbank
 **Regra de dependência:** `adapter -> application -> domain`. Domínio não conhece framework. Cada módulo publica pequena API Java explícita (`port/in` ou facade pública). **Não** importar JPA entities, repositórios ou tabelas privadas de outro módulo. Proibir ciclos com ArchUnit; Spring Modulith pode complementar.
 
 ## Shared kernel (`shared/domain`)
-Tipos de domínio usados por vários módulos e sem dono natural. Hoje: **`Money` e `Currency`**.
+Tipos de domínio usados por vários módulos e sem dono natural. Hoje: **`Money` e `InstanceCurrency`** (enum com as moedas suportadas; só `BRL` no MVP).
 
 - **Por que não no `ledger`:** `accounts`, `transfers` e `funding` também usam `Money`. Com o tipo no ledger, `accounts → ledger` somado a `ledger → accounts` (consulta de status, [ADR-0003](../adr/0003-ciclo-de-vida-e-encerramento-de-contas.md)) cria ciclo entre módulos.
 - **Entra:** objetos de valor imutáveis, estáveis e sem regra específica de um módulo.
 - **Não entra:** IDs de módulos (`AccountId`, `JournalId`, `TransferId`), regras de saldo (BR-016 é do ledger), entidades, portas ou qualquer dependência de framework.
-- **Regra de dependência:** `shared` não depende de nenhum módulo (`accounts`, `ledger`, ...). A verificar com ArchUnit, junto da regra existente que mantém `..domain..` livre de framework.
+- **Regra de dependência:** `shared` não depende de nenhum módulo (`accounts`, `ledger`, ...). Verificado por `ArchitectureTest.sharedDoesNotDependOnModules`, junto da regra que mantém `..domain..` livre de framework.
 
 ### `Money` — o que deve fazer e respeitar
 Regras de negócio: **[BR-001](../domain/BUSINESS_RULES.md#dinheiro-e-contas)** (moeda conhecida, sem overflow silencioso, sem `double`) e **[BR-052](../domain/BUSINESS_RULES.md#auditoria-e-estados)** (sempre unidade menor + moeda explícita). Uso no ledger: [ADR-0002](../adr/0002-convencao-contabil.md).
