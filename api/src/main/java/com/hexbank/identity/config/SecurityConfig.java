@@ -22,7 +22,7 @@ public class SecurityConfig {
         var problemHandlers = new ProblemSecurityHandlers();
 
         http
-                .csrf(AbstractHttpConfigurer::disable)   // API stateless, sem cookie
+                .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -35,7 +35,6 @@ public class SecurityConfig {
                         .requestMatchers("/v1/dev/**").hasRole("TEST_ADMIN")
                         .anyRequest().authenticated());
 
-        // Identidade simulada SÓ em dev/test. Fora disso ninguém autentica até existir JWT.
         if (env.acceptsProfiles(Profiles.of("dev", "test"))) {
             http.addFilterBefore(new DevHeaderAuthenticationFilter(), AnonymousAuthenticationFilter.class);
         }

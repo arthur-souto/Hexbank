@@ -10,6 +10,8 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
@@ -43,6 +45,17 @@ class ArchitectureTest {
             .whereLayer("Application").mayOnlyBeAccessedByLayers("Adapter")
             .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Adapter")
             .withOptionalLayers(true);
+
+    /**
+     * shared é o kernel comum (Money, Currency, tipos técnicos): todos dependem dele, ele não depende de ninguém.
+     * Sem isso, shared vira ponte de acoplamento entre módulos (docs/architecture/ARCHITECTURE.md, "Shared kernel").
+     */
+    @ArchTest
+    static final ArchRule sharedDoesNotDependOnModules = classes()
+            .that().resideInAPackage("com.hexbank.shared..")
+            .should().onlyDependOnClassesThat(
+                    resideOutsideOfPackage("com.hexbank..").or(resideInAPackage("com.hexbank.shared..")))
+            .as("shared não depende de nenhum módulo (accounts, ledger, identity, bootstrap, ...)");
 
     /** Entre módulos, só application.port.in e domain. shared e a raiz ficam de fora. */
     @ArchTest
