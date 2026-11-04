@@ -36,8 +36,12 @@ em entry. O sinal só aparece no **cálculo** do saldo, a partir da natureza da 
 
 `INCOME` e `EXPENSE` (taxas, juros) ficam fora do MVP e entram por ADR próprio quando houver cobrança.
 
-`normal_balance` é **derivado** do tipo no domínio (`type.normalBalance()`); a coluna existe no banco
-para leitura e checagem por SQL, com `CHECK` coerente com o tipo.
+`normal_balance` é **derivado** do tipo no domínio (`type.normalBalance()`) e nunca informado. No banco,
+existe só para leitura e checagem por SQL, como **coluna gerada** (`GENERATED ALWAYS AS (CASE type …) STORED`):
+o Postgres calcula o valor a partir de `type`, rejeita INSERT/UPDATE com valor explícito e, portanto, ela
+não pode divergir do tipo. A aplicação não grava essa coluna (no JPA, não mapear ou mapear somente leitura).
+O `CASE` não tem `ELSE`: um tipo novo (ex.: `INCOME`/`EXPENSE`) sem mapeamento gera `NULL` e é rejeitado
+pelo `NOT NULL`, obrigando a atualizar a migration junto com o enum.
 
 ### 3. Contas institucionais e contrapartida do funding
 

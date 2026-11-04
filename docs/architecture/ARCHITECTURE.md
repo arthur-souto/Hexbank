@@ -134,7 +134,7 @@ Regras de negócio: **[BR-010 a BR-016](../domain/BUSINESS_RULES.md#ledger)**. C
 |---|---|
 | Tipos | `ASSET`, `LIABILITY`, `EQUITY` no MVP (`INCOME`/`EXPENSE` só por ADR) |
 | Lados | `EntrySide` = `DEBIT` \| `CREDIT` |
-| Saldo normal | `type.normalBalance()`: `ASSET → DEBIT`; `LIABILITY` e `EQUITY → CREDIT`. Derivado, nunca informado |
+| Saldo normal | `type.normalBalance()`: `ASSET → DEBIT`; `LIABILITY` e `EQUITY → CREDIT`. Derivado, nunca informado; não é campo do `LedgerAccount`. No banco, `normal_balance` é coluna gerada a partir de `type` (ADR-0002) |
 | Delta | `+valor` se o lado do entry é o saldo normal da conta, `−valor` caso contrário (ADR-0002, seção 5) |
 
 ### `LedgerAccount`
