@@ -18,26 +18,29 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 
 ### Pendências conscientes herdadas para a Fase 1
 - `ApiApplication` vive em `com.hexbank.bootstrap` com scan explícito de `com.hexbank` (componentes, entidades e repositórios); todo `@SpringBootTest` declara `classes = ApiApplication.class`.
-- Pacote `com.hexbank.api` está vazio e não consta no ARCHITECTURE.md: definir propósito ou remover.
+- ~~Pacote `com.hexbank.api` está vazio e não consta no ARCHITECTURE.md: definir propósito ou remover.~~ Resolvido: pacote removido (commit `896d82a`).
 - Controller de identidade (`GET /v1/me`) ainda não existe; resolver o principal nos controllers via `@AuthenticationPrincipal PrincipalId`.
 - Ainda não há tratamento de `MethodArgumentNotValidException` com lista de campos: adicionar junto do primeiro DTO com Bean Validation (`spring-boot-starter-validation`).
 
 ## Fase 1 — Contas + Ledger + funding fictício
-- [ ] Registrar **ADR-0002 (convenção contábil)** antes do código: natureza das contas (ativo/passivo), sinal de débito/crédito, contas de contrapartida do funding.
+- [x] Registrar **ADR-0002 (convenção contábil)** antes do código ([`docs/adr/0002-convencao-contabil.md`](../adr/0002-convencao-contabil.md), status: aceito): natureza das contas (ativo/passivo), sinal de débito/crédito, contas de contrapartida do funding.
+- [x] Registrar **ADR-0003 (ciclo de vida e encerramento de contas)** ([`docs/adr/0003-ciclo-de-vida-e-encerramento-de-contas.md`](../adr/0003-ciclo-de-vida-e-encerramento-de-contas.md), status: aceito) e **ADR-0004 (retenção de auditoria)** ([`docs/adr/0004-retencao-de-auditoria.md`](../adr/0004-retencao-de-auditoria.md), status: aceito).
 - [ ] Implementar `Money` (moeda + `long` minorUnits, `Math.addExact`/`subtractExact`) e testes puros de propriedade.
 - [ ] Implementar Account, LedgerAccount, Journal, JournalEntry no `domain` sem Spring/JPA (ArchUnit já bloqueia).
 - [ ] Migrations `V2__accounts.sql`, `V3__ledger.sql` nos schemas `accounts`/`ledger` com CHECKs, FKs e bloqueio de UPDATE/DELETE em entries (trigger ou permissão).
 - [ ] Adaptadores `adapter/out/persistence` (JPA ou JDBC) separados das entidades de domínio.
 - [ ] Endpoints `POST /v1/accounts`, `GET /v1/accounts/{id}`, `GET /v1/accounts/{id}/balance` com owner vindo do `PrincipalId`.
 - [ ] `POST /v1/dev/funding` com `@Profile({"dev","test"})` no controller **e** `TEST_ADMIN` (já exigido em `SecurityConfig`).
+- [ ] Funding exige `Idempotency-Key` desde já (ausente ou fora de 16–128 caracteres → `400 INVALID_REQUEST`), para o contrato HTTP não mudar na Fase 2. **Sem deduplicação na Fase 1**: repetir a chamada gera novo journal (limitação consciente, só `dev`/`test`).
 - [ ] Materializar projeção de saldo na mesma transação dos entries.
+- [ ] `audit_log` mínimo ([ADR-0004](../adr/0004-retencao-de-auditoria.md)): migration `V4__audit.sql` no schema `audit` com bloqueio de UPDATE/DELETE; registros `ACCOUNT_CREATED` e `FUNDING_POSTED` gravados na mesma transação do caso de uso; teste de integração confirma o registro e a ausência de dados sensíveis.
 - [ ] Novos `code`s em `ErrorCodes` (`ACCOUNT_NOT_FOUND`, `ACCOUNT_NOT_ACTIVE`) + documentação no Swagger (`@Operation`, `@ApiResponse`).
 - [ ] Testes: unitários de domínio, `@WebMvcTest` + `spring-security-test` para contrato HTTP, integração Postgres para invariantes.
-**Pronto quando:** totais contábeis fecham e projeção coincide com entries; funding tem contrapartida.
+**Pronto quando:** totais contábeis fecham e projeção coincide com entries; funding tem contrapartida; criação de conta e funding deixam registro no `audit_log`.
 
 ## Fase 2 — Transferência interna confiável
 - [ ] Criar caso de uso, controller, DTOs, errors e autorização de origem.
-- [ ] Implementar idempotência persistente por `(principal, operation, key)` + hash do payload.
+- [ ] Implementar idempotência persistente por `(principal, operation, key)` + hash do payload, aplicada a transferências **e** ao funding (que já recebe a chave desde a Fase 1).
 - [ ] Garantir atomicidade com ledger e status, e locks ordenados/projeção condicional.
 - [ ] Escrever testes com repetição após timeout HTTP, duplicidade concorrente e 50 débitos simultâneos.
 - [ ] Comparar pessimista/otimista/UPDATE condicional somente após baseline correto.
@@ -78,4 +81,4 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 - [ ] Fazer simulações de entrevista e registrar trade-offs.
 
 ## Próxima tarefa concreta
-**Iniciar a Fase 1 pelo ADR-0002 (convenção contábil) e por `Money` com testes puros.** Nenhum endpoint financeiro antes de congelar a convenção contábil. Idempotência fica para a Fase 2. Não antecipar Redis/Kafka/gateway externo.
+**Seguir a Fase 1 por `Money` com testes puros** (ADRs 0002–0004 aceitos). Nenhum endpoint financeiro antes de congelar a convenção contábil. Deduplicação idempotente fica para a Fase 2 (na Fase 1 o funding só valida a presença da `Idempotency-Key`). Não antecipar Redis/Kafka/gateway externo.

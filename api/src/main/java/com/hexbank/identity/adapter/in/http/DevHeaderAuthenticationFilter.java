@@ -39,7 +39,6 @@ public class DevHeaderAuthenticationFilter extends OncePerRequestFilter {
             context.setAuthentication(authentication);
             SecurityContextHolder.getContextHolderStrategy().setContext(context);
         });
-        // Sem principal válido segue anônimo: o entry point devolve 401 problem+json se a rota exigir login.
         chain.doFilter(request, response);
     }
 

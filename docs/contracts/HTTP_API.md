@@ -46,6 +46,12 @@ OpenAPI gerado pelo springdoc em `dev`/`test`: `/v3/api-docs` (JSON) e `/swagger
 ```
 O endpoint gera journal balanceado com contrapartida institucional; não é depósito real.
 
+**Idempotência por fase:**
+- **Fase 1:** `Idempotency-Key` obrigatória e validada (ausente ou fora de 16–128 caracteres → `400 INVALID_REQUEST`), mas **sem deduplicação**: repetir a requisição gera novo funding.
+- **Fase 2:** deduplicação persistente (BR-030 a BR-033), com o mesmo contrato; replays retornam `Idempotent-Replay: true`.
+
+Conta destino fora de `ACTIVE` → `409 ACCOUNT_NOT_ACTIVE` ([ADR-0003](../adr/0003-ciclo-de-vida-e-encerramento-de-contas.md)).
+
 ## Transferência interna (fase 2)
 `POST /v1/transfers` — requer `Idempotency-Key`; `201 Created`.
 ```json

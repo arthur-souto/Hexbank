@@ -13,7 +13,7 @@
 | `holds` | ledger | `id PK`, `account_id`, `transfer_id UNIQUE`, `amount_minor`, `status`; liberação/consumo único |
 | `transfers` | transfers | `id PK`, origem, destino, moeda, valor, status, `journal_id UNIQUE`, timestamps |
 | `idempotency_records` | transfers/funding | `(principal_id, operation, key) UNIQUE`, `payload_hash`, `status`, `response_status`, `response_body`, `expires_at` |
-| `audit_log` | shared/security | `id PK`, principal, action, aggregate, correlation, timestamp; sem segredos |
+| `audit_log` | shared/security (schema `audit`) | `id PK`, `occurred_at`, `principal_id`, `action`, `aggregate_type`/`aggregate_id`, `request_id`/`correlation_id`, `from_status`/`to_status` e `reason` opcionais; append-only, sem segredos nem dados pessoais ([ADR-0004](../adr/0004-retencao-de-auditoria.md)) |
 | `outbox_events` | outbox (futuro) | `event_id PK`, tipo, versão, aggregate, payload, estado, tentativa, next_attempt_at |
 | `inbox_events` | consumidores (futuro) | `(consumer_name, event_id) UNIQUE`, processado em |
 
@@ -37,4 +37,6 @@ HAVING SUM(CASE WHEN side = 'DEBIT' THEN minor_units ELSE -minor_units END) <> 0
 Retorno esperado: **zero linhas**. Também validar moeda por journal e consistência de projeções em testes próprios.
 
 ## Decisões para antes da V1 do schema
-Fixar convenção de sinais para ativos/passivos, contas institucionais, retenção de auditoria, exclusão lógica de contas e escopo das reservas. Registrar ADR-0002.
+- **Decidido no [ADR-0002](../adr/0002-convencao-contabil.md)** (status: aceito): convenção de sinais para ativos/passivos, contas institucionais (`SIMULATED_CASH:BRL`) e escopo das reservas (hold não gera journal no MVP).
+- **Decidido no [ADR-0003](../adr/0003-ciclo-de-vida-e-encerramento-de-contas.md)** (status: aceito): exclusão lógica/encerramento de contas (BR-005). `CLOSED` é terminal, exige saldo zero e nenhum hold ativo; `V2__accounts.sql` tem `CHECK` de status e `closed_at`.
+- **Decidido no [ADR-0004](../adr/0004-retencao-de-auditoria.md)** (status: aceito): `audit_log` append-only, retenção indefinida no MVP, só identificadores opacos.
