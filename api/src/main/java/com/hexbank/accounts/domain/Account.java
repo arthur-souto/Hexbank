@@ -9,12 +9,12 @@ import java.time.Instant;
 import java.util.Objects;
 
 public class Account {
-    AccountId id;
-    PrincipalId ownerId;
-    InstanceCurrency currency;
-    AccountStatus status;
-    Instant createdAt;
-    Instant closedAt;
+    private AccountId id;
+    private PrincipalId ownerId;
+    private InstanceCurrency currency;
+    private AccountStatus status;
+    private Instant createdAt;
+    private Instant closedAt;
 
     public static Account open(AccountId accountId, PrincipalId ownerId, InstanceCurrency currency, Instant now) {
         Account account = new Account();
