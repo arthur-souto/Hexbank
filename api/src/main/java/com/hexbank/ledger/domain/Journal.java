@@ -40,9 +40,9 @@ public final class Journal {
     }
 
     private void requireSingleCurrency() {
-        final var currency = entries.getFirst().getAmount().currency();
+        final var currency = entries.getFirst().amount().currency();
         boolean multiCurrency = entries.stream()
-                .anyMatch(e -> !e.getAmount().currency().equals(currency));
+                .anyMatch(e -> !e.amount().currency().equals(currency));
         if(multiCurrency) {
             throw new IllegalArgumentException("All entries in a journal must have the same currency");
         }
@@ -53,8 +53,8 @@ public final class Journal {
         Set<LedgerAccountId> accountIds = new HashSet<>();
 
         for(JournalEntry journalEntry : entries) {
-            if(!accountIds.add(journalEntry.getLedgerAccountId())) {
-                throw new IllegalArgumentException("A journal cannot have multiple entries for the same account: " + journalEntry.getLedgerAccountId());
+            if(!accountIds.add(journalEntry.ledgerAccountId())) {
+                throw new IllegalArgumentException("A journal cannot have multiple entries for the same account: " + journalEntry.ledgerAccountId());
             }
         }
     }
@@ -69,10 +69,10 @@ public final class Journal {
     }
 
     private Money sumOf(EntrySide side) {
-        Money zero = new Money(entries.getFirst().getAmount().currency(), 0);
+        Money zero = new Money(entries.getFirst().amount().currency(), 0);
         return entries.stream()
-                .filter(e -> e.getSide() == side)
-                .map(JournalEntry::getAmount)
+                .filter(e -> e.side() == side)
+                .map(JournalEntry::amount)
                 .reduce(zero, Money::plus);
     }
 

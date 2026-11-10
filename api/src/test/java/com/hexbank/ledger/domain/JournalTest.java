@@ -67,7 +67,7 @@ class JournalTest {
             assertThat(journal.getReferenceId()).isEqualTo(FUNDING_ID);
             assertThat(journal.getCreatedAt()).isEqualTo(CREATED_AT);
             assertThat(journal.getEntries())
-                    .extracting(JournalEntry::getLedgerAccountId, JournalEntry::getSide, JournalEntry::getAmount)
+                    .extracting(JournalEntry::ledgerAccountId, JournalEntry::side, JournalEntry::amount)
                     .containsExactly(
                             tuple(SIMULATED_CASH, EntrySide.DEBIT, brl(10_000)),
                             tuple(CUSTOMER, EntrySide.CREDIT, brl(10_000)));
@@ -252,7 +252,7 @@ class JournalTest {
             Journal reversal = funding().reverse(REVERSAL_ID, REVERSED_AT);
 
             assertThat(reversal.getEntries())
-                    .extracting(JournalEntry::getLedgerAccountId, JournalEntry::getSide, JournalEntry::getAmount)
+                    .extracting(JournalEntry::ledgerAccountId, JournalEntry::side, JournalEntry::amount)
                     .containsExactly(
                             tuple(SIMULATED_CASH, EntrySide.CREDIT, brl(10_000)),
                             tuple(CUSTOMER, EntrySide.DEBIT, brl(10_000)));
@@ -267,7 +267,7 @@ class JournalTest {
             assertThat(original.getReferenceType()).isEqualTo(JournalReferenceType.FUNDING);
             assertThat(original.getReversalOf()).isEmpty();
             assertThat(original.getEntries())
-                    .extracting(JournalEntry::getSide)
+                    .extracting(JournalEntry::side)
                     .containsExactly(EntrySide.DEBIT, EntrySide.CREDIT);
         }
 

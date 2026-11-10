@@ -4,10 +4,7 @@ import com.hexbank.shared.domain.Money;
 
 import java.util.Objects;
 
-public final class JournalEntry {
-    private final LedgerAccountId ledgerAccountId;
-    private final EntrySide side;
-    private final Money amount;
+public record JournalEntry(LedgerAccountId ledgerAccountId, EntrySide side, Money amount) {
 
     public JournalEntry(LedgerAccountId ledgerAccountId, EntrySide side, Money amount) {
         this.ledgerAccountId = Objects.requireNonNull(ledgerAccountId, "ledgerAccountId cannot be null");
@@ -23,22 +20,10 @@ public final class JournalEntry {
     private Money checkMoneyIsPositive(Money money) {
         Objects.requireNonNull(money, "amount cannot be null");
 
-        if(!money.isPositive()) {
+        if (!money.isPositive()) {
             throw new IllegalArgumentException("amount must be positive");
         }
 
         return money;
-    }
-
-    public LedgerAccountId getLedgerAccountId() {
-        return ledgerAccountId;
-    }
-
-    public EntrySide getSide() {
-        return side;
-    }
-
-    public Money getAmount() {
-        return amount;
     }
 }

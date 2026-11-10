@@ -19,9 +19,9 @@ class JournalEntryTest {
     void criaEntryComOsDadosInformados() {
         JournalEntry entry = new JournalEntry(ACCOUNT, EntrySide.DEBIT, AMOUNT);
 
-        assertThat(entry.getLedgerAccountId()).isEqualTo(ACCOUNT);
-        assertThat(entry.getSide()).isEqualTo(EntrySide.DEBIT);
-        assertThat(entry.getAmount()).isEqualTo(AMOUNT);
+        assertThat(entry.ledgerAccountId()).isEqualTo(ACCOUNT);
+        assertThat(entry.side()).isEqualTo(EntrySide.DEBIT);
+        assertThat(entry.amount()).isEqualTo(AMOUNT);
     }
 
     @ParameterizedTest
@@ -44,16 +44,16 @@ class JournalEntryTest {
     void reversedInverteDebitoParaCredito() {
         JournalEntry reversed = new JournalEntry(ACCOUNT, EntrySide.DEBIT, AMOUNT).reversed();
 
-        assertThat(reversed.getSide()).isEqualTo(EntrySide.CREDIT);
-        assertThat(reversed.getLedgerAccountId()).isEqualTo(ACCOUNT);
-        assertThat(reversed.getAmount()).isEqualTo(AMOUNT);
+        assertThat(reversed.side()).isEqualTo(EntrySide.CREDIT);
+        assertThat(reversed.ledgerAccountId()).isEqualTo(ACCOUNT);
+        assertThat(reversed.amount()).isEqualTo(AMOUNT);
     }
 
     @Test
     void reversedInverteCreditoParaDebito() {
         JournalEntry reversed = new JournalEntry(ACCOUNT, EntrySide.CREDIT, AMOUNT).reversed();
 
-        assertThat(reversed.getSide()).isEqualTo(EntrySide.DEBIT);
+        assertThat(reversed.side()).isEqualTo(EntrySide.DEBIT);
     }
 
     @Test
@@ -62,6 +62,6 @@ class JournalEntryTest {
 
         original.reversed();
 
-        assertThat(original.getSide()).isEqualTo(EntrySide.DEBIT);
+        assertThat(original.side()).isEqualTo(EntrySide.DEBIT);
     }
 }
