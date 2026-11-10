@@ -89,4 +89,9 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 - [ ] Fazer simulações de entrevista e registrar trade-offs.
 
 ## Próxima tarefa concreta
-**Implementar os casos de uso do ledger ([API pública](../architecture/ARCHITECTURE.md#api-pública-do-ledger-applicationportin), LED-UC-01 a 04).** Domínio, migrations `V1`–`V4` e adapters de persistência estão prontos e testados. Começar por LED-UC-04 e LED-UC-01, depois LED-UC-02 (com os testes de rollback #3 a #6) e LED-UC-03. Em seguida, os casos de uso de `accounts` (com auditoria: SHR-AU-02 #5 e SHR-AU-03 #1/#2) e o funding. Deduplicação idempotente fica para a Fase 2 (na Fase 1 o funding só valida a `Idempotency-Key`). Não antecipar Redis/Kafka/gateway externo.
+**Implementar os casos de uso do ledger ([API pública](../architecture/ARCHITECTURE.md#api-pública-do-ledger-applicationportin), LED-UC-01 a 05).** Domínio, migrations `V1`–`V4` e adapters de persistência estão prontos e testados. Ordem sugerida:
+1. Ledger: LED-UC-04 e LED-UC-05 (só leitura), LED-UC-01, LED-UC-02 (com os testes de rollback #3 a #7, incluindo o #4b) e LED-UC-03.
+2. `accounts`: ACC-UC-04 (`AccountStatusQuery`, interno), depois ACC-UC-01 a 03 com auditoria (SHR-AU-02 #5 e SHR-AU-03 #1/#2).
+3. Funding, seguindo os passos do serviço documentados na spec.
+
+Antes de escrever os testes que exigem rollback, ler [testes de rollback e dados append-only](../architecture/ARCHITECTURE.md#testes-de-rollback-e-dados-append-only): sem `@Transactional` no teste, ids aleatórios e conferência por id. Deduplicação idempotente fica para a Fase 2 (na Fase 1 o funding só valida a `Idempotency-Key`). Não antecipar Redis/Kafka/gateway externo.

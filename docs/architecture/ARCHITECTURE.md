@@ -138,7 +138,15 @@ public interface GetAccountQuery {
     AccountBalanceView balance(PrincipalId principal, AccountId id); // AccountNotFoundException
 }
 public record AccountBalanceView(UUID accountId, Money booked, Money reserved, Money available, Instant asOf) {}
+
+// Consulta interna para outros módulos (funding, depois transfers). NÃO confere dono:
+// a autorização é de quem chama (ex.: TEST_ADMIN no funding). Nunca exposta por HTTP.
+public interface AccountStatusQuery {
+    InstanceCurrency requireActive(UUID accountId);   // AccountNotFoundException; AccountNotActiveException
+}
 ```
+
+O `AccountStatusQuery` recebe `UUID` (e não `AccountId`) porque os outros módulos conhecem a conta só pelo `UUID` (ver "Dependências entre módulos na Fase 1"). Ele devolve a moeda para que quem chama confira a moeda do valor (FUN-02 #3) sem carregar a `Account`.
 
 | Exceção | Onde fica | HTTP |
 |---|---|---|
@@ -181,8 +189,21 @@ O id (`UUID.randomUUID()`) e o instante (`Clock` injetado) são gerados pelo ser
 | 3 | conta de outro dono ou inexistente | `GET .../balance` | `404 ACCOUNT_NOT_FOUND` |
 | 4 | qualquer conta | `GET .../balance` | os valores vêm da [consulta de saldo do ledger](#led-uc-03--consultar-saldo); o `accounts` não calcula nada |
 
+#### ACC-UC-04 — Exigir conta ativa (`AccountStatusQuery`, uso interno)
+> **Como** módulo que movimenta dinheiro (funding, depois transfers), **quero** saber se a conta existe, está ativa e qual a sua moeda, **para** recusar o pedido antes de lançar qualquer coisa (BR-005, ADR-0003).
+
+| # | Dado | Quando | Então |
+|---|---|---|---|
+| 1 | conta `A` `ACTIVE` em BRL | `requireActive(A)` | devolve `BRL` |
+| 2 | conta `BLOCKED` ou `CLOSED` | `requireActive` | `AccountNotActiveException` (`409 ACCOUNT_NOT_ACTIVE`) |
+| 3 | `UUID` inexistente | `requireActive` | `AccountNotFoundException` (`404 ACCOUNT_NOT_FOUND`) |
+| 4 | conta `A` de `P`, chamada feita no contexto de outro principal | `requireActive(A)` | devolve `BRL`: esta consulta não confere dono |
+| 5 | `null` | `requireActive` | `NullPointerException` |
+
+Implementação: `findById` no `AccountRepository` + `Account.requireActive()`. Só leitura; participa da transação de quem chama.
+
 **Fora do escopo:** bloquear, desbloquear e encerrar por HTTP (o domínio já suporta, ADR-0003); extrato.
-**Pronto quando:** `@WebMvcTest` cobre ACC-UC-01 a 03 (status, corpo, `code`); um teste de integração com Postgres prova ACC-UC-01 #2 e #6.
+**Pronto quando:** `@WebMvcTest` cobre ACC-UC-01 a 03 (status, corpo, `code`); teste unitário do serviço cobre ACC-UC-04; um teste de integração com Postgres prova ACC-UC-01 #2 e #6 (ver [testes de rollback](#testes-de-rollback-e-dados-append-only)). Para forçar a falha do ACC-UC-01 #6, substituir o `OpenCustomerLedgerAccountUseCase` por um `@MockitoSpyBean` que lança `RuntimeException` depois de a `Account` já ter sido salva.
 
 ## Domínio do módulo `ledger`
 Regras de negócio: **[BR-010 a BR-016](../domain/BUSINESS_RULES.md#ledger)**. Convenção contábil: **[ADR-0002](../adr/0002-convencao-contabil.md)**, que tem precedência sobre esta seção em caso de dúvida.
@@ -440,7 +461,13 @@ public record LedgerBalanceView(UUID accountId, Money booked, Money reserved, Mo
 public interface FindInstitutionalAccountQuery {
     LedgerAccountId byCode(String code);          // inexistente → IllegalStateException (500)
 }
+
+public interface FindCustomerLedgerAccountQuery {
+    Optional<LedgerAccountId> byAccountId(UUID accountId);   // traduz a conta do cliente para a conta contábil
+}
 ```
+
+O `PostJournalCommand` usa `LedgerAccountId`, mas quem chama (funding, transfers) só conhece o `accountId`. O `FindCustomerLedgerAccountQuery` faz essa tradução sem expor `LedgerAccount` nem o repositório.
 
 **Portas de saída** (`ledger/application/port/out`, ✅ implementadas em `adapter/out/persistence`; escritas e lock exigem a transação de quem chama, `Propagation.MANDATORY`):
 
@@ -481,18 +508,19 @@ Passos, todos na transação de quem chama:
 1. Gerar `JournalId` e `createdAt` (`Clock`).
 2. Carregar as `LedgerAccount`s (`LedgerAccountRepository.findAllById`); faltou alguma → LED-UC-02 #4; conferir que a moeda de cada entry = moeda da sua conta.
 3. Travar as projeções dessas contas em **ordem crescente de `LedgerAccountId`** (`BalanceProjectionRepository.lockForUpdate`, `SELECT … FOR UPDATE … ORDER BY`). Ordem estável evita deadlock (BR-022). A ordem é a do Postgres para `uuid`, a mesma em todas as transações.
-
-Carregar as contas antes de travar não abre janela de corrida: `ledger_accounts` nunca muda depois de criada. E o `lockForUpdate` precisa delas, porque `balance_projections` não guarda moeda.
 4. Criar o `Journal` com `Journal.post(...)` (valida BR-010).
 5. Para cada entry, `projection.apply(entry, account)` (valida BR-016).
 6. Gravar journal + entries e as projeções (LED-BP-09). Devolver o `JournalId`.
+
+Carregar as contas (passo 2) antes de travar (passo 3) não abre janela de corrida: `ledger_accounts` nunca muda depois de criada. E o `lockForUpdate` precisa delas, porque `balance_projections` não guarda moeda.
 
 | # | Dado | Quando | Então |
 |---|---|---|---|
 | 1 | cliente `C` com 0, `SIMULATED_CASH` com 0 | `post(FUNDING, f1, [DEBIT cash 10000, CREDIT C 10000])` | devolve `JournalId`; 1 journal + 2 entries gravados; `C.booked = 10000`, `cash.booked = 10000` |
 | 2 | o mesmo cenário | um teste recalcula pelos entries | bate com as projeções (LED-BP-10) |
 | 3 | entries desbalanceados | `post` | `IllegalArgumentException` (500); nada gravado |
-| 4 | `LedgerAccountId` inexistente | `post` | `IllegalArgumentException` (500); nada gravado |
+| 4 | `LedgerAccountId` inexistente (`findAllById` devolve menos contas que os entries) | `post` | `IllegalArgumentException` (500); nada gravado |
+| 4b | conta existe, mas sem projeção (`lockForUpdate` devolve menos projeções que as contas) | `post` | `IllegalStateException` (500): dado inconsistente, não erro de quem chama; nada gravado |
 | 5 | entry com moeda diferente da conta | `post` | `IllegalArgumentException` (500); nada gravado |
 | 6 | débito que deixa cliente negativo | `post` | `InsufficientFundsException` (409); nada gravado, nem as outras projeções |
 | 7 | `(FUNDING, f1)` já lançado | `post` de novo com `f1` | violação de `UNIQUE` → exceção (500); rollback. Na Fase 1 o funding sempre gera `referenceId` novo, então isso só acontece por bug |
@@ -517,14 +545,25 @@ Carregar as contas antes de travar não abre janela de corrida: `ledger_accounts
 | 1 | `V3__ledger.sql` aplicada | `byCode("SIMULATED_CASH:BRL")` | o UUID fixo `00000000-0000-0000-0000-00000000ca5e` |
 | 2 | código inexistente | `byCode("X")` | `IllegalStateException` (500): configuração errada, não erro do cliente |
 
+#### LED-UC-05 — Localizar conta contábil do cliente
+> **Como** módulo `funding` (depois `transfers`), **quero** achar a conta contábil a partir do `accountId`, **para** montar os entries do journal.
+
+| # | Dado | Quando | Então |
+|---|---|---|---|
+| 1 | conta aberta pelo LED-UC-01 | `byAccountId(accountId)` | o `LedgerAccountId` devolvido pelo `open` |
+| 2 | `accountId` sem conta contábil | `byAccountId` | `Optional.empty()` |
+| 3 | `null` | `byAccountId` | `NullPointerException` |
+
+Implementação: `LedgerAccountRepository.findByAccountId(...).map(LedgerAccount::getId)`.
+
 **Fora do escopo:** estorno pela API (o domínio já tem `Journal.reverse`; ainda não há caso de uso), extrato, holds.
-**Pronto quando:** testes de integração com Postgres cobrem LED-UC-01 a 04, incluindo o rollback de LED-UC-02 #3 a #7.
+**Pronto quando:** testes de integração com Postgres cobrem LED-UC-01 a 05, incluindo o rollback de LED-UC-02 #3 a #7 (ver [testes de rollback](#testes-de-rollback-e-dados-append-only)).
 
 ## Domínio do módulo `funding`
 Regras de negócio: **[BR-003](../domain/BUSINESS_RULES.md#dinheiro-e-contas)**. Contrato: [HTTP_API](../contracts/HTTP_API.md#funding-de-laboratório-fase-1-apenas-dev--test). Lançamento de referência: [ADR-0002](../adr/0002-convencao-contabil.md), seção 4.
 
 ### Funding fictício (`POST /v1/dev/funding`)
-**Status:** ⏳ a implementar. Regras: **[BR-003](../domain/BUSINESS_RULES.md#dinheiro-e-contas)**, **[BR-005](../domain/BUSINESS_RULES.md#dinheiro-e-contas)**, **[BR-012](../domain/BUSINESS_RULES.md#ledger)**, **[BR-030](../domain/BUSINESS_RULES.md#idempotência)** (só a validação da chave), **[BR-050](../domain/BUSINESS_RULES.md#auditoria-e-estados)**; [SECURITY.md](../operations/SECURITY.md) regra 3. Depende de: `Account.requireActive()`, [LED-UC-02](#led-uc-02--lançar-journal), [LED-UC-04](#led-uc-04--localizar-conta-institucional), [IdempotencyKey](#idempotencykey-shareddomain), [AuditEntry](#auditentry-e-porta-de-auditoria).
+**Status:** ⏳ a implementar. Regras: **[BR-003](../domain/BUSINESS_RULES.md#dinheiro-e-contas)**, **[BR-005](../domain/BUSINESS_RULES.md#dinheiro-e-contas)**, **[BR-012](../domain/BUSINESS_RULES.md#ledger)**, **[BR-030](../domain/BUSINESS_RULES.md#idempotência)** (só a validação da chave), **[BR-050](../domain/BUSINESS_RULES.md#auditoria-e-estados)**; [SECURITY.md](../operations/SECURITY.md) regra 3. Depende de: [ACC-UC-04](#acc-uc-04--exigir-conta-ativa-accountstatusquery-uso-interno) (`AccountStatusQuery`), [LED-UC-02](#led-uc-02--lançar-journal), [LED-UC-04](#led-uc-04--localizar-conta-institucional), [LED-UC-05](#led-uc-05--localizar-conta-contábil-do-cliente), [IdempotencyKey](#idempotencykey-shareddomain), [AuditEntry](#auditentry-e-porta-de-auditoria). Pela regra do `ArchitectureTest`, o funding só usa `application.port.in` e `domain` dos outros módulos.
 
 **Contrato**
 
@@ -536,6 +575,19 @@ public record PostFundingCommand(PrincipalId principal, IdempotencyKey key, UUID
                                  Money amount, String requestId) {}
 public record FundingResult(UUID fundingId, JournalId journalId, UUID accountId, Money amount) {}
 ```
+
+Passos do serviço, numa única transação (`@Transactional` no serviço do funding):
+1. A `IdempotencyKey` já chega válida no command (o controller faz `IdempotencyKey.of(header)`; inválida → `400`).
+2. `amount.isPositive()`, senão `400 INVALID_REQUEST` (FUN-02 #2).
+3. `AccountStatusQuery.requireActive(accountId)` → moeda da conta (`404`/`409`, FUN-02 #4 e #5).
+4. Moeda do `amount` ≠ moeda da conta → `400 INVALID_REQUEST` (FUN-02 #3).
+5. `FindCustomerLedgerAccountQuery.byAccountId(accountId)`; vazio → `IllegalStateException` (500): conta sem conta contábil é dado inconsistente.
+6. `FindInstitutionalAccountQuery.byCode("SIMULATED_CASH:" + moeda)`.
+7. Gerar `fundingId` (`UUID.randomUUID()`) e chamar `PostJournalUseCase.post(FUNDING, fundingId, [DEBIT caixa amount, CREDIT cliente amount])`.
+8. `AuditLogPort.record(FUNDING_POSTED, aggregateType = JOURNAL, aggregateId = journalId, requestId do command)`; o `principalId` é o `TEST_ADMIN`.
+9. Devolver o `FundingResult`.
+
+Os passos 2 a 6 vêm antes do lançamento: nenhum journal nasce de um pedido errado.
 
 HTTP:
 
@@ -584,7 +636,7 @@ X-Dev-Principal: <uuid>    X-Dev-Roles: TEST_ADMIN
 | 3 | sem principal | `POST` | `401 UNAUTHENTICATED` |
 
 **Fora do escopo:** deduplicação pela chave (Fase 2, BR-030 a BR-033); dinheiro real.
-**Pronto quando:** `@WebMvcTest` cobre FUN-02 #1 a #3 e FUN-03; teste de integração cobre FUN-01 e FUN-02 #4 a #6.
+**Pronto quando:** `@WebMvcTest` cobre FUN-02 #1 a #3 e FUN-03; teste de integração cobre FUN-01 e FUN-02 #4 a #6 (ver [testes de rollback](#testes-de-rollback-e-dados-append-only)). Para forçar a falha do FUN-02 #6, um `@MockitoSpyBean` no `AuditLogPort` que lança depois de o journal ter sido lançado.
 
 ## Tipos comuns da Fase 1 em `shared`
 
@@ -728,6 +780,20 @@ identity ◀── accounts ──▶ ledger
 | 409 | `INSUFFICIENT_FUNDS` | `InsufficientFundsException` da `BalanceProjection` ([LED-BP-05](#led-bp-05--cliente-nunca-fica-com-disponível-negativo); sem gatilho pela API na Fase 1) |
 
 Moeda desconhecida (`CurrencyNotSupportedException`), valor não positivo, moeda divergente e `Idempotency-Key` inválida (`InvalidIdempotencyKeyException`) usam o `400 INVALID_REQUEST` que já existe. Hoje o `ApiExceptionHandler` não trata `BusinessException`: o mapeamento `exceção → code` entra junto com estes códigos.
+
+**Decisão:** `OptimisticLockingFailureException` (projeção alterada entre a leitura e a gravação, LED-BP-09) e `DataIntegrityViolationException` (ex.: LED-UC-02 #7) **não** ganham `code` próprio: caem no `500 INTERNAL_ERROR` genérico, com log. Na Fase 1 as projeções são travadas com `FOR UPDATE` e o `referenceId` é sempre novo, então os dois casos só acontecem por bug. Um `409` de concorrência entra só se a Fase 2 trocar o lock pessimista pelo otimista.
+
+## Testes de rollback e dados append-only
+
+Os cenários "nada gravado" (LED-UC-02 #3 a #7, ACC-UC-01 #6, FUN-02 #6, SHR-AU-03 #2) precisam de um rollback de verdade, e não do rollback automático do teste:
+
+1. **Sem `@Transactional` no teste** (classe ou método com `@Transactional(propagation = NOT_SUPPORTED)`). A transação é a do serviço; para o ledger, que não abre transação própria, usar um `TransactionTemplate` no teste.
+2. **Ids aleatórios por teste** (`UUID.randomUUID()` para conta, `referenceId`, `requestId`) e conferência **por id**: `SELECT count(*) … WHERE reference_id = ?`, nunca `count(*)` da tabela inteira.
+3. **Sem limpeza**: os triggers impedem `DELETE`/`TRUNCATE` em `journals`, `journal_entries` e `audit_log`. O banco do Testcontainers é descartado no fim da execução, e os ids aleatórios evitam interferência entre testes.
+4. **Saldo do caixa**: como os commits acumulam, nunca conferir o `booked` absoluto do `SIMULATED_CASH`; conferir a diferença antes/depois, ou conferir só a conta do cliente criada no teste.
+5. Para forçar uma falha no meio do fluxo, `@MockitoSpyBean` na porta seguinte ao passo que já gravou (ver ACC-UC-01 e FUN-02).
+
+Os testes que só verificam o que foi gravado (sem rollback) continuam com `@Transactional` + `flush()`, como `LedgerPersistenceIntegrationTest`.
 
 ## Fronteiras transacionais
 - Transferência interna: uma transação ACID PostgreSQL cobre verificação/autorização, reserva ou débito, journal balanceado, transferência, idempotência e eventual outbox quando usada.
