@@ -231,8 +231,8 @@ Uma linha do lançamento. Não tem id próprio: faz parte do `Journal`. O `id` e
 |---|---|
 | Moeda | moeda do `amount` = moeda da `LedgerAccount`; verificado pelo [lançamento](#led-uc-02--lançar-journal), quando a conta é carregada |
 | Estorno | `reversed()` devolve um entry novo, com a mesma conta e o mesmo valor e o lado invertido |
-| Imutável | `final class`, campos `final`, sem setters; nunca UPDATE/DELETE (BR-011) |
-| Igualdade | sem `equals`/`hashCode`; os testes comparam campo a campo |
+| Imutável | `record` (acessores `ledgerAccountId()`, `side()`, `amount()`), sem setters; nunca UPDATE/DELETE (BR-011) |
+| Igualdade | por valor (`equals`/`hashCode` gerados pelo `record`): dois entries com mesma conta, lado e valor são iguais |
 
 ### `Journal`
 **Status:** ✅ implementado (`ledger/domain/Journal.java`; testes em `JournalTest`). Regras: **[BR-010](../domain/BUSINESS_RULES.md#ledger)**, **[BR-011](../domain/BUSINESS_RULES.md#ledger)**, **[BR-012](../domain/BUSINESS_RULES.md#ledger)**, [ADR-0002](../adr/0002-convencao-contabil.md).
@@ -272,7 +272,7 @@ Journal desbalanceado, multimoeda ou com entry inválido indica **bug do chamado
 **Pendente fora do domínio:** a unicidade de `(reference_type, reference_id)` e de `reversal_of` vai na `V3__ledger.sql`, com teste de integração. O teste de "uma moeda" entra quando o `InstanceCurrency` ganhar uma segunda moeda.
 
 ### `BalanceProjection`
-**Status:** ⏳ a implementar (`ledger/domain/BalanceProjection.java`). Regras: **[BR-013](../domain/BUSINESS_RULES.md#ledger)** (saldo só muda por lançamento), **[BR-014](../domain/BUSINESS_RULES.md#ledger)** (disponível = contábil − reservas), **[BR-016](../domain/BUSINESS_RULES.md#ledger)** (cliente nunca negativo), **[BR-022](../domain/BUSINESS_RULES.md#transferências-internas)** (concorrência), [ADR-0002](../adr/0002-convencao-contabil.md) seções 5 e 6. Tabela: `balance_projections` ([DATA_MODEL](DATA_MODEL.md)).
+**Status:** ✅ implementado (`ledger/domain/BalanceProjection.java`, `ledger/domain/exceptions/InsufficientFundsException.java`; testes em `BalanceProjectionTest`, LED-BP-01 a 08). LED-BP-09 e 10 ficam para a integração, depois da `V3__ledger.sql`. Os casos de moeda diferente (LED-BP-06 #3, LED-BP-08 #4) estão `@Disabled` até existir uma segunda moeda. Regras: **[BR-013](../domain/BUSINESS_RULES.md#ledger)** (saldo só muda por lançamento), **[BR-014](../domain/BUSINESS_RULES.md#ledger)** (disponível = contábil − reservas), **[BR-016](../domain/BUSINESS_RULES.md#ledger)** (cliente nunca negativo), **[BR-022](../domain/BUSINESS_RULES.md#transferências-internas)** (concorrência), [ADR-0002](../adr/0002-convencao-contabil.md) seções 5 e 6. Tabela: `balance_projections` ([DATA_MODEL](DATA_MODEL.md)).
 
 O saldo de uma conta contábil, mantido atualizado a cada entry para não ser preciso somar todos os entries em cada consulta. Ela é uma **cópia derivada** do ledger: a fonte de verdade continuam sendo os entries.
 
@@ -304,7 +304,7 @@ public class InsufficientFundsException extends BusinessException { }
 ```
 
 - **Imutável:** `apply` devolve uma projeção nova e não altera a atual. Se `apply` lançar exceção, a projeção original continua intacta, e a regra "nada é gravado" é cumprida sem esforço.
-- **Delta:** `account.getType().delta(entry.getSide(), entry.getAmount().minorUnits())` (já existe em `LedgerAccountType`), somado com `booked.plus(...)`.
+- **Delta:** `account.getType().delta(entry.side(), entry.amount().minorUnits())` (já existe em `LedgerAccountType`), somado com `booked.plus(...)`.
 - **Por que `apply` recebe a `LedgerAccount`:** a projeção precisa do `type` (para o delta) e de `allowsNegativeAvailable()` (BR-016), mas não guarda essas informações, que são da conta.
 
 #### LED-BP-01 — Projeção zerada na abertura
