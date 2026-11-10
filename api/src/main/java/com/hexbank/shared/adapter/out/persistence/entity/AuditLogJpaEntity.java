@@ -1,4 +1,4 @@
-package com.hexbank.shared.adapter.out.persistence;
+package com.hexbank.shared.adapter.out.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -48,9 +48,9 @@ public class AuditLogJpaEntity {
 
     protected AuditLogJpaEntity() { }
 
-    AuditLogJpaEntity(UUID id, Instant occurredAt, UUID principalId, String action, String aggregateType,
-                      UUID aggregateId, String requestId, String correlationId,
-                      String fromStatus, String toStatus, String reason) {
+    public AuditLogJpaEntity(UUID id, Instant occurredAt, UUID principalId, String action, String aggregateType,
+                             UUID aggregateId, String requestId, String correlationId,
+                             String fromStatus, String toStatus, String reason) {
         this.id = id;
         this.occurredAt = occurredAt;
         this.principalId = principalId;

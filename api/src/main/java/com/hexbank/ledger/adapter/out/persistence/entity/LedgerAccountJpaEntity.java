@@ -1,4 +1,4 @@
-package com.hexbank.ledger.adapter.out.persistence;
+package com.hexbank.ledger.adapter.out.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -27,7 +27,7 @@ public class LedgerAccountJpaEntity {
 
     protected LedgerAccountJpaEntity() { }
 
-    LedgerAccountJpaEntity(UUID id, UUID accountId, String code, String currency, String type) {
+    public LedgerAccountJpaEntity(UUID id, UUID accountId, String code, String currency, String type) {
         this.id = id;
         this.accountId = accountId;
         this.code = code;

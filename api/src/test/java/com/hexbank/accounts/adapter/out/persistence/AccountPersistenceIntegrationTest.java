@@ -1,6 +1,8 @@
 package com.hexbank.accounts.adapter.out.persistence;
 
 import com.hexbank.TestContainersConfiguration;
+import com.hexbank.accounts.adapter.out.persistence.entity.AccountJpaEntity;
+import com.hexbank.accounts.adapter.out.persistence.jpa.AccountJpaRepository;
 import com.hexbank.accounts.domain.Account;
 import com.hexbank.accounts.domain.AccountId;
 import com.hexbank.accounts.domain.AccountStatus;

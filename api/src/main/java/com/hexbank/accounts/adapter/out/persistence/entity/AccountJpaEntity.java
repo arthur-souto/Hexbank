@@ -1,4 +1,4 @@
-package com.hexbank.accounts.adapter.out.persistence;
+package com.hexbank.accounts.adapter.out.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -32,7 +32,7 @@ public class AccountJpaEntity {
     @Version
     private long version;
 
-    AccountJpaEntity update(String status, Instant closedAt) {
+    public AccountJpaEntity update(String status, Instant closedAt) {
         this.status = status;
         this.closedAt = closedAt;
         return this;
@@ -40,7 +40,7 @@ public class AccountJpaEntity {
 
     protected AccountJpaEntity() { }
 
-    AccountJpaEntity(UUID id, UUID ownerId, String currency, String status, Instant createdAt, Instant closedAt) {
+    public AccountJpaEntity(UUID id, UUID ownerId, String currency, String status, Instant createdAt, Instant closedAt) {
         this.id = id;
         this.ownerId = ownerId;
         this.currency = currency;

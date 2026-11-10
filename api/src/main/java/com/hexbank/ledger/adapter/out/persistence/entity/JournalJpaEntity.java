@@ -1,4 +1,4 @@
-package com.hexbank.ledger.adapter.out.persistence;
+package com.hexbank.ledger.adapter.out.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -30,7 +30,7 @@ public class JournalJpaEntity {
 
     protected JournalJpaEntity() { }
 
-    JournalJpaEntity(UUID id, String referenceType, UUID referenceId, Instant createdAt, UUID reversalOf) {
+    public JournalJpaEntity(UUID id, String referenceType, UUID referenceId, Instant createdAt, UUID reversalOf) {
         this.id = id;
         this.referenceType = referenceType;
         this.referenceId = referenceId;

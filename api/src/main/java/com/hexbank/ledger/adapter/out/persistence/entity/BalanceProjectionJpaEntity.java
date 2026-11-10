@@ -1,4 +1,4 @@
-package com.hexbank.ledger.adapter.out.persistence;
+package com.hexbank.ledger.adapter.out.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -25,13 +25,13 @@ public class BalanceProjectionJpaEntity {
 
     protected BalanceProjectionJpaEntity() { }
 
-    BalanceProjectionJpaEntity(UUID ledgerAccountId, long bookedMinorUnits, long reservedMinorUnits) {
+    public BalanceProjectionJpaEntity(UUID ledgerAccountId, long bookedMinorUnits, long reservedMinorUnits) {
         this.ledgerAccountId = ledgerAccountId;
         this.bookedMinorUnits = bookedMinorUnits;
         this.reservedMinorUnits = reservedMinorUnits;
     }
 
-    BalanceProjectionJpaEntity update(long bookedMinorUnits, long reservedMinorUnits) {
+    public BalanceProjectionJpaEntity update(long bookedMinorUnits, long reservedMinorUnits) {
         this.bookedMinorUnits = bookedMinorUnits;
         this.reservedMinorUnits = reservedMinorUnits;
         return this;
