@@ -612,7 +612,7 @@ public class InvalidIdempotencyKeyException extends BusinessException { }
 **Pronto quando:** `IdempotencyKeyTest` cobre SHR-IK-01 a 03.
 
 ### `AuditEntry` e porta de auditoria
-**Status:** ⏳ a implementar. Regras: **[BR-050](../domain/BUSINESS_RULES.md#auditoria-e-estados)** e **[BR-051](../domain/BUSINESS_RULES.md#auditoria-e-estados)**, **[ADR-0004](../adr/0004-retencao-de-auditoria.md)**, [SECURITY.md](../operations/SECURITY.md) regras 8 e 10. O tipo fica em `shared/domain` e a porta em `shared/application/port/out`, porque todos os módulos auditam; o adapter grava no schema `audit`.
+**Status:** ✅ domínio implementado (`shared/domain/AuditEntry.java`, `ReasonCode.java`, `shared/application/port/out/AuditLogPort.java`; testes em `AuditEntryTest`). Falta o adapter e a migration `V4__audit.sql` (SHR-AU-02 #5 e SHR-AU-03). Regras: **[BR-050](../domain/BUSINESS_RULES.md#auditoria-e-estados)** e **[BR-051](../domain/BUSINESS_RULES.md#auditoria-e-estados)**, **[ADR-0004](../adr/0004-retencao-de-auditoria.md)**, [SECURITY.md](../operations/SECURITY.md) regras 8 e 10. O tipo fica em `shared/domain` e a porta em `shared/application/port/out`, porque todos os módulos auditam; o adapter grava no schema `audit`.
 
 **Campos**
 
@@ -627,7 +627,7 @@ public class InvalidIdempotencyKeyException extends BusinessException { }
 | `requestId` | `String` | obrigatório; o `X-Request-Id` da requisição |
 | `correlationId` | `String`, pode ser nulo | para eventos assíncronos (Fase 3) |
 | `fromStatus` / `toStatus` | `String`, podem ser nulos | os dois juntos ou nenhum (BR-051) |
-| `reason` | `String`, pode ser nulo | **código** em `UPPER_SNAKE_CASE` (ex.: `CUSTOMER_REQUEST`), nunca texto livre |
+| `reason` | `String`, pode ser nulo | **código** em `UPPER_SNAKE_CASE` (ex.: `CUSTOMER_REQUEST`), nunca texto livre: casa `^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$` (sem `_` no início, no fim ou duplicado) e tem no máximo 64 caracteres. Validado por `ReasonCode` em `shared/domain` |
 
 O que **não** existe no tipo, de propósito: nome, documento, e-mail, payload, token, `Idempotency-Key` e valores em dinheiro. O registro aponta para o journal, e o valor é lido no ledger (ADR-0004).
 
@@ -663,9 +663,10 @@ O `requestId` chega ao caso de uso pelo command (o controller lê o atributo do 
 | # | Dado | Quando | Então |
 |---|---|---|---|
 | 1 | `reason = "CUSTOMER_REQUEST"` | criar | aceito |
-| 2 | `reason = "cliente pediu"` (texto livre) | criar | `IllegalArgumentException` (precisa casar `^[A-Z][A-Z0-9_]*$`) |
-| 3 | só `fromStatus` preenchido | criar | `IllegalArgumentException` (os dois juntos ou nenhum) |
-| 4 | após abrir conta e fazer funding | ler `audit.audit_log` (integração) | nenhuma coluna contém a `Idempotency-Key`, o valor do funding ou os headers |
+| 2 | `reason = "cliente pediu"` (texto livre) | criar | `IllegalArgumentException` (precisa casar `^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$`), sem repetir o valor na mensagem |
+| 3 | `reason` com `_` no início, no fim ou duplicado (`"CUSTOMER_"`, `"CUSTOMER__REQUEST"`), ou com mais de 64 caracteres | criar | `IllegalArgumentException` |
+| 4 | só `fromStatus` ou só `toStatus` preenchido | criar | `IllegalArgumentException` (os dois juntos ou nenhum) |
+| 5 | após abrir conta e fazer funding | ler `audit.audit_log` (integração) | nenhuma coluna contém a `Idempotency-Key`, o valor do funding ou os headers |
 
 #### SHR-AU-03 — Gravado junto com a operação, nunca alterado
 > **Como** auditor, **quero** que a auditoria exista se e somente se a operação aconteceu, e que nunca mude, **para** confiar no histórico.
@@ -677,7 +678,7 @@ O `requestId` chega ao caso de uso pelo command (o controller lê o atributo do 
 | 3 | um registro gravado | `UPDATE` ou `DELETE` direto no banco | recusado pelo trigger ou pela permissão (`V4__audit.sql`) |
 
 **Fora do escopo:** auditar recusas (ADR-0004 seção 4 prevê, mas entra com os endpoints de mudança de status); expurgo/arquivamento.
-**Pronto quando:** `AuditEntryTest` cobre SHR-AU-01 e 02 #1 a #3; integração cobre SHR-AU-02 #4 e SHR-AU-03.
+**Pronto quando:** `AuditEntryTest` cobre SHR-AU-01 e 02 #1 a #4; integração cobre SHR-AU-02 #5 e SHR-AU-03.
 
 ## Dependências entre módulos na Fase 1
 

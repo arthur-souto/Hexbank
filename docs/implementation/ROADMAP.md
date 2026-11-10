@@ -33,7 +33,7 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
   - [x] [Journal](../architecture/ARCHITECTURE.md#journal) (`JournalTest`)
   - [x] [BalanceProjection](../architecture/ARCHITECTURE.md#balanceprojection) (`BalanceProjectionTest`, LED-BP-01 a 08; 09 e 10 são integração, junto com os adapters)
   - [x] [IdempotencyKey](../architecture/ARCHITECTURE.md#idempotencykey-shareddomain) (`IdempotencyKeyTest`, SHR-IK-01 a 03)
-  - [ ] [AuditEntry](../architecture/ARCHITECTURE.md#auditentry-e-porta-de-auditoria): SHR-AU-01 e 02
+  - [x] [AuditEntry](../architecture/ARCHITECTURE.md#auditentry-e-porta-de-auditoria) e `AuditLogPort` (`AuditEntryTest`, SHR-AU-01 e 02 #1 a #4; 02 #5 e 03 são integração, junto com `V4__audit.sql`)
 - [ ] Casos de uso (ACC-UC, LED-UC, FUN): [abrir/consultar conta](../architecture/ARCHITECTURE.md#casos-de-uso-de-accounts), [API pública do ledger](../architecture/ARCHITECTURE.md#api-pública-do-ledger-applicationportin) e [funding](../architecture/ARCHITECTURE.md#funding-fictício-post-v1devfunding), respeitando as [dependências entre módulos](../architecture/ARCHITECTURE.md#dependências-entre-módulos-na-fase-1).
 - [ ] Migrations `V2__accounts.sql`, `V3__ledger.sql` nos schemas `accounts`/`ledger` com CHECKs, FKs e bloqueio de UPDATE/DELETE em entries (trigger ou permissão).
 - [ ] Adaptadores `adapter/out/persistence` (JPA ou JDBC) separados das entidades de domínio.
@@ -89,4 +89,4 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 - [ ] Fazer simulações de entrevista e registrar trade-offs.
 
 ## Próxima tarefa concreta
-**Implementar a [`AuditEntry`](../architecture/ARCHITECTURE.md#auditentry-e-porta-de-auditoria) e a porta de auditoria (SHR-AU-01 e 02).** `Account`, `LedgerAccount`, `JournalEntry`, `Journal`, `BalanceProjection` e `IdempotencyKey` estão concluídos com testes puros. Com o domínio fechado, seguir para as migrations `V2`–`V4` e os casos de uso. Deduplicação idempotente fica para a Fase 2 (na Fase 1 o funding só valida a `Idempotency-Key`). Não antecipar Redis/Kafka/gateway externo.
+**Criar as migrations `V2__accounts.sql`, `V3__ledger.sql` e `V4__audit.sql`.** O domínio da Fase 1 está fechado: `Account`, `LedgerAccount`, `JournalEntry`, `Journal`, `BalanceProjection`, `IdempotencyKey` e `AuditEntry` (com `AuditLogPort`) concluídos com testes puros. Depois das migrations, seguir para os adapters de persistência e os casos de uso. Deduplicação idempotente fica para a Fase 2 (na Fase 1 o funding só valida a `Idempotency-Key`). Não antecipar Redis/Kafka/gateway externo.
