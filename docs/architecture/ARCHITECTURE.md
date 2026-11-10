@@ -55,7 +55,7 @@ Todo tipo de domínio e todo caso de uso segue o mesmo formato. Para novos itens
 | Erro de programação: o chamador montou algo inválido | `IllegalArgumentException`, `IllegalStateException`, `NullPointerException`, `ArithmeticException` | `500 INTERNAL_ERROR`, nunca `4xx` |
 
 ## Shared kernel (`shared/domain`)
-Tipos de domínio usados por vários módulos e sem dono natural. Hoje: **`Money` e `InstanceCurrency`** (enum com as moedas suportadas; só `BRL` no MVP). Na Fase 1 entram também `IdempotencyKey` e `AuditEntry` com sua porta de saída (ver "Tipos comuns da Fase 1 em `shared`").
+Tipos de domínio usados por vários módulos e sem dono natural. Hoje: **`Money`, `InstanceCurrency`** (enum com as moedas suportadas; só `BRL` no MVP) **e `IdempotencyKey`**. Na Fase 1 entra também `AuditEntry` com sua porta de saída (ver "Tipos comuns da Fase 1 em `shared`").
 
 - **Por que não no `ledger`:** `accounts`, `transfers` e `funding` também usam `Money`. Com o tipo no ledger, todo módulo dependeria do ledger só por um objeto de valor, e o ledger nunca poderia depender de nenhum deles sem criar ciclo.
 - **Entra:** objetos de valor imutáveis, estáveis e sem regra específica de um módulo.
@@ -564,7 +564,7 @@ X-Dev-Principal: <uuid>    X-Dev-Roles: TEST_ADMIN
 ## Tipos comuns da Fase 1 em `shared`
 
 ### `IdempotencyKey` (`shared/domain`)
-**Status:** ⏳ a implementar. Regras: **[BR-030](../domain/BUSINESS_RULES.md#idempotência)** (chave obrigatória ao mover dinheiro), [HTTP_API — convenções](../contracts/HTTP_API.md#convenções) (16–128 caracteres), [ADR-0004](../adr/0004-retencao-de-auditoria.md) (nunca no log). Usado por `funding` (Fase 1) e `transfers` (Fase 2).
+**Status:** ✅ implementado (`shared/domain/IdempotencyKey.java`, `shared/domain/exceptions/InvalidIdempotencyKeyException.java`; testes em `IdempotencyKeyTest`, SHR-IK-01 a 03). A validação fica no construtor compacto, então `new IdempotencyKey(...)` também é validado; `of` só delega. O mapeamento `BusinessException` → `400 INVALID_REQUEST` no `ApiExceptionHandler` ainda não existe e entra com o endpoint de funding. Regras: **[BR-030](../domain/BUSINESS_RULES.md#idempotência)** (chave obrigatória ao mover dinheiro), [HTTP_API — convenções](../contracts/HTTP_API.md#convenções) (16–128 caracteres), [ADR-0004](../adr/0004-retencao-de-auditoria.md) (nunca no log). Usado por `funding` (Fase 1) e `transfers` (Fase 2).
 
 | Campo | Tipo | Regra |
 |---|---|---|
