@@ -269,10 +269,10 @@ O construtor é privado: só essas duas fábricas criam journals. Assim, `REVERS
 
 Journal desbalanceado, multimoeda ou com entry inválido indica **bug do chamador**, não erro do cliente: vira `IllegalArgumentException`/`IllegalStateException`, mapeada para `500 INTERNAL_ERROR`, nunca `4xx`.
 
-**Pendente fora do domínio:** a unicidade de `(reference_type, reference_id)` e de `reversal_of` já está na `V3__ledger.sql`; falta o teste de integração, junto com o adapter. O teste de "uma moeda" entra quando o `InstanceCurrency` ganhar uma segunda moeda.
+**Pendente fora do domínio:** a unicidade de `(reference_type, reference_id)` e de `reversal_of` está na `V3__ledger.sql`, coberta por `LedgerPersistenceIntegrationTest`. O teste de "uma moeda" entra quando o `InstanceCurrency` ganhar uma segunda moeda.
 
 ### `BalanceProjection`
-**Status:** ✅ implementado (`ledger/domain/BalanceProjection.java`, `ledger/domain/exceptions/InsufficientFundsException.java`; testes em `BalanceProjectionTest`, LED-BP-01 a 08). LED-BP-09 e 10 ficam para a integração, depois da `V3__ledger.sql`. Os casos de moeda diferente (LED-BP-06 #3, LED-BP-08 #4) estão `@Disabled` até existir uma segunda moeda. Regras: **[BR-013](../domain/BUSINESS_RULES.md#ledger)** (saldo só muda por lançamento), **[BR-014](../domain/BUSINESS_RULES.md#ledger)** (disponível = contábil − reservas), **[BR-016](../domain/BUSINESS_RULES.md#ledger)** (cliente nunca negativo), **[BR-022](../domain/BUSINESS_RULES.md#transferências-internas)** (concorrência), [ADR-0002](../adr/0002-convencao-contabil.md) seções 5 e 6. Tabela: `balance_projections` ([DATA_MODEL](DATA_MODEL.md)).
+**Status:** ✅ implementado (`ledger/domain/BalanceProjection.java`, `ledger/domain/exceptions/InsufficientFundsException.java`; testes em `BalanceProjectionTest`, LED-BP-01 a 08). LED-BP-09 e 10 cobertos por `LedgerPersistenceIntegrationTest` (adapter com `@Version` e lock ordenado). Os casos de moeda diferente (LED-BP-06 #3, LED-BP-08 #4) estão `@Disabled` até existir uma segunda moeda. Regras: **[BR-013](../domain/BUSINESS_RULES.md#ledger)** (saldo só muda por lançamento), **[BR-014](../domain/BUSINESS_RULES.md#ledger)** (disponível = contábil − reservas), **[BR-016](../domain/BUSINESS_RULES.md#ledger)** (cliente nunca negativo), **[BR-022](../domain/BUSINESS_RULES.md#transferências-internas)** (concorrência), [ADR-0002](../adr/0002-convencao-contabil.md) seções 5 e 6. Tabela: `balance_projections` ([DATA_MODEL](DATA_MODEL.md)).
 
 O saldo de uma conta contábil, mantido atualizado a cada entry para não ser preciso somar todos os entries em cada consulta. Ela é uma **cópia derivada** do ledger: a fonte de verdade continuam sendo os entries.
 
@@ -412,7 +412,7 @@ Na Fase 1 também se travam as projeções com `SELECT … FOR UPDATE` em ordem 
 | 2 | após N fundings | somar todos os entries por moeda | Σ débitos = Σ créditos (BR-015) |
 
 **Fora do escopo:** holds e mudanças em `reserved` (Fase 4); o `asOf` da consulta de saldo, que é o instante da leitura (ver [LED-UC-03](#led-uc-03--consultar-saldo)); multimoeda.
-**Pronto quando:** `BalanceProjectionTest` cobre LED-BP-01 a 08; teste de integração com Postgres cobre LED-BP-09 e 10, depois da `V3__ledger.sql`.
+**Pronto quando:** `BalanceProjectionTest` cobre LED-BP-01 a 08; teste de integração com Postgres (`LedgerPersistenceIntegrationTest`) cobre LED-BP-09 e 10. ✅
 
 ### API pública do ledger (`application/port/in`)
 **Status:** ⏳ a implementar. Regras: **[BR-010 a BR-016](../domain/BUSINESS_RULES.md#ledger)**, **[BR-022](../domain/BUSINESS_RULES.md#transferências-internas)**, [ADR-0002](../adr/0002-convencao-contabil.md), [ADR-0003](../adr/0003-ciclo-de-vida-e-encerramento-de-contas.md).
@@ -442,6 +442,29 @@ public interface FindInstitutionalAccountQuery {
 }
 ```
 
+**Portas de saída** (`ledger/application/port/out`, ✅ implementadas em `adapter/out/persistence`; escritas e lock exigem a transação de quem chama, `Propagation.MANDATORY`):
+
+```java
+public interface LedgerAccountRepository {
+    void save(LedgerAccount account);
+    Optional<LedgerAccount> findById(LedgerAccountId id);
+    List<LedgerAccount> findAllById(Collection<LedgerAccountId> ids);
+    Optional<LedgerAccount> findByAccountId(UUID accountId);
+    Optional<LedgerAccount> findByCode(String code);
+}
+
+public interface JournalRepository {
+    void save(Journal journal);   // journal + entries, só INSERT; o adapter gera o id de cada entry
+}
+
+public interface BalanceProjectionRepository {
+    void insert(BalanceProjection projection);                                  // LED-UC-01
+    List<BalanceProjection> lockForUpdate(Collection<LedgerAccount> accounts);  // LED-UC-02: FOR UPDATE ordenado; conta sem projeção não volta
+    Optional<BalanceProjection> findFor(LedgerAccount account);                 // LED-UC-03
+    void update(BalanceProjection projection);                                  // LED-BP-09: version diferente → OptimisticLockingFailureException
+}
+```
+
 #### LED-UC-01 — Abrir conta contábil de cliente
 > **Como** módulo `accounts`, **quero** criar a conta contábil do cliente junto com a conta, **para** que ela já possa receber lançamentos.
 
@@ -456,8 +479,10 @@ public interface FindInstitutionalAccountQuery {
 
 Passos, todos na transação de quem chama:
 1. Gerar `JournalId` e `createdAt` (`Clock`).
-2. Travar as projeções das contas envolvidas em **ordem crescente de `LedgerAccountId`** (`SELECT … FOR UPDATE`). Ordem estável evita deadlock (BR-022).
-3. Carregar as `LedgerAccount`s; conferir que a moeda de cada entry = moeda da sua conta.
+2. Carregar as `LedgerAccount`s (`LedgerAccountRepository.findAllById`); faltou alguma → LED-UC-02 #4; conferir que a moeda de cada entry = moeda da sua conta.
+3. Travar as projeções dessas contas em **ordem crescente de `LedgerAccountId`** (`BalanceProjectionRepository.lockForUpdate`, `SELECT … FOR UPDATE … ORDER BY`). Ordem estável evita deadlock (BR-022). A ordem é a do Postgres para `uuid`, a mesma em todas as transações.
+
+Carregar as contas antes de travar não abre janela de corrida: `ledger_accounts` nunca muda depois de criada. E o `lockForUpdate` precisa delas, porque `balance_projections` não guarda moeda.
 4. Criar o `Journal` com `Journal.post(...)` (valida BR-010).
 5. Para cada entry, `projection.apply(entry, account)` (valida BR-016).
 6. Gravar journal + entries e as projeções (LED-BP-09). Devolver o `JournalId`.
@@ -612,7 +637,7 @@ public class InvalidIdempotencyKeyException extends BusinessException { }
 **Pronto quando:** `IdempotencyKeyTest` cobre SHR-IK-01 a 03.
 
 ### `AuditEntry` e porta de auditoria
-**Status:** ✅ domínio implementado (`shared/domain/AuditEntry.java`, `ReasonCode.java`, `shared/application/port/out/AuditLogPort.java`; testes em `AuditEntryTest`). A migration `V4__audit.sql` existe (tabela append-only com trigger); falta o adapter e os testes de integração (SHR-AU-02 #5 e SHR-AU-03). Regras: **[BR-050](../domain/BUSINESS_RULES.md#auditoria-e-estados)** e **[BR-051](../domain/BUSINESS_RULES.md#auditoria-e-estados)**, **[ADR-0004](../adr/0004-retencao-de-auditoria.md)**, [SECURITY.md](../operations/SECURITY.md) regras 8 e 10. O tipo fica em `shared/domain` e a porta em `shared/application/port/out`, porque todos os módulos auditam; o adapter grava no schema `audit`.
+**Status:** ✅ domínio implementado (`shared/domain/AuditEntry.java`, `ReasonCode.java`, `shared/application/port/out/AuditLogPort.java`; testes em `AuditEntryTest`). Migration `V4__audit.sql` e `AuditLogPersistenceAdapter` implementados; `AuditLogPersistenceIntegrationTest` cobre SHR-AU-03 #3. SHR-AU-02 #5 e SHR-AU-03 #1/#2 entram com os casos de uso. Regras: **[BR-050](../domain/BUSINESS_RULES.md#auditoria-e-estados)** e **[BR-051](../domain/BUSINESS_RULES.md#auditoria-e-estados)**, **[ADR-0004](../adr/0004-retencao-de-auditoria.md)**, [SECURITY.md](../operations/SECURITY.md) regras 8 e 10. O tipo fica em `shared/domain` e a porta em `shared/application/port/out`, porque todos os módulos auditam; o adapter grava no schema `audit`.
 
 **Campos**
 
