@@ -1,6 +1,6 @@
 # Modelo de dados proposto
 
-**Status:** desenho, não migrações executadas. PostgreSQL único inicialmente. Cada módulo é dono de suas tabelas; acesso cruzado somente via portas públicas. Preferir `UUID`, `TIMESTAMPTZ`, `BIGINT` para unidades menores e constraints explícitas.
+**Status:** Fase 1 aplicada pelas migrations `V1`–`V4` (`accounts`, `ledger_accounts`, `journals`, `journal_entries`, `balance_projections`, `audit_log`); as demais tabelas continuam como desenho. PostgreSQL único inicialmente. Cada módulo é dono de suas tabelas; acesso cruzado somente via portas públicas. Preferir `UUID`, `TIMESTAMPTZ`, `BIGINT` para unidades menores e constraints explícitas.
 
 ## Ownership
 | Tabela | Módulo | Colunas essenciais e restrições |

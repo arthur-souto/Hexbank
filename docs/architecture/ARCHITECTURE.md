@@ -269,7 +269,7 @@ O construtor é privado: só essas duas fábricas criam journals. Assim, `REVERS
 
 Journal desbalanceado, multimoeda ou com entry inválido indica **bug do chamador**, não erro do cliente: vira `IllegalArgumentException`/`IllegalStateException`, mapeada para `500 INTERNAL_ERROR`, nunca `4xx`.
 
-**Pendente fora do domínio:** a unicidade de `(reference_type, reference_id)` e de `reversal_of` vai na `V3__ledger.sql`, com teste de integração. O teste de "uma moeda" entra quando o `InstanceCurrency` ganhar uma segunda moeda.
+**Pendente fora do domínio:** a unicidade de `(reference_type, reference_id)` e de `reversal_of` já está na `V3__ledger.sql`; falta o teste de integração, junto com o adapter. O teste de "uma moeda" entra quando o `InstanceCurrency` ganhar uma segunda moeda.
 
 ### `BalanceProjection`
 **Status:** ✅ implementado (`ledger/domain/BalanceProjection.java`, `ledger/domain/exceptions/InsufficientFundsException.java`; testes em `BalanceProjectionTest`, LED-BP-01 a 08). LED-BP-09 e 10 ficam para a integração, depois da `V3__ledger.sql`. Os casos de moeda diferente (LED-BP-06 #3, LED-BP-08 #4) estão `@Disabled` até existir uma segunda moeda. Regras: **[BR-013](../domain/BUSINESS_RULES.md#ledger)** (saldo só muda por lançamento), **[BR-014](../domain/BUSINESS_RULES.md#ledger)** (disponível = contábil − reservas), **[BR-016](../domain/BUSINESS_RULES.md#ledger)** (cliente nunca negativo), **[BR-022](../domain/BUSINESS_RULES.md#transferências-internas)** (concorrência), [ADR-0002](../adr/0002-convencao-contabil.md) seções 5 e 6. Tabela: `balance_projections` ([DATA_MODEL](DATA_MODEL.md)).
@@ -612,7 +612,7 @@ public class InvalidIdempotencyKeyException extends BusinessException { }
 **Pronto quando:** `IdempotencyKeyTest` cobre SHR-IK-01 a 03.
 
 ### `AuditEntry` e porta de auditoria
-**Status:** ✅ domínio implementado (`shared/domain/AuditEntry.java`, `ReasonCode.java`, `shared/application/port/out/AuditLogPort.java`; testes em `AuditEntryTest`). Falta o adapter e a migration `V4__audit.sql` (SHR-AU-02 #5 e SHR-AU-03). Regras: **[BR-050](../domain/BUSINESS_RULES.md#auditoria-e-estados)** e **[BR-051](../domain/BUSINESS_RULES.md#auditoria-e-estados)**, **[ADR-0004](../adr/0004-retencao-de-auditoria.md)**, [SECURITY.md](../operations/SECURITY.md) regras 8 e 10. O tipo fica em `shared/domain` e a porta em `shared/application/port/out`, porque todos os módulos auditam; o adapter grava no schema `audit`.
+**Status:** ✅ domínio implementado (`shared/domain/AuditEntry.java`, `ReasonCode.java`, `shared/application/port/out/AuditLogPort.java`; testes em `AuditEntryTest`). A migration `V4__audit.sql` existe (tabela append-only com trigger); falta o adapter e os testes de integração (SHR-AU-02 #5 e SHR-AU-03). Regras: **[BR-050](../domain/BUSINESS_RULES.md#auditoria-e-estados)** e **[BR-051](../domain/BUSINESS_RULES.md#auditoria-e-estados)**, **[ADR-0004](../adr/0004-retencao-de-auditoria.md)**, [SECURITY.md](../operations/SECURITY.md) regras 8 e 10. O tipo fica em `shared/domain` e a porta em `shared/application/port/out`, porque todos os módulos auditam; o adapter grava no schema `audit`.
 
 **Campos**
 
