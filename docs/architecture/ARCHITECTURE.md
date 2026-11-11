@@ -155,6 +155,10 @@ O `AccountStatusQuery` recebe `UUID` (e não `AccountId`) porque os outros módu
 
 O id (`UUID.randomUUID()`) e o instante (`Clock` injetado) são gerados pelo serviço, nunca recebidos do cliente. Com o `Clock` injetado, os testes ficam determinísticos.
 
+> **Ordem de implementação × ordem de execução.** Esta seção vem antes da do ledger só porque o documento é organizado por módulo.
+> - **Implementação:** a [API pública do ledger](#api-pública-do-ledger-applicationportin) (LED-UC-01 em especial) deve existir **antes** do ACC-UC-01, que a chama (ver [ROADMAP](../implementation/ROADMAP.md#próxima-tarefa-concreta)).
+> - **Execução do ACC-UC-01**, numa única transação: 1) salvar a `Account`; 2) `OpenCustomerLedgerAccountUseCase.open(...)` (cria `LedgerAccount` + projeção zerada); 3) gravar a auditoria `ACCOUNT_CREATED`. Se qualquer passo falhar, nada fica gravado (#6).
+
 #### ACC-UC-01 — Abrir conta (`POST /v1/accounts`)
 > **Como** cliente autenticado, **quero** abrir uma conta em BRL, **para** poder receber dinheiro.
 
