@@ -35,7 +35,7 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
   - [x] [IdempotencyKey](../architecture/ARCHITECTURE.md#idempotencykey-shareddomain) (`IdempotencyKeyTest`, SHR-IK-01 a 03)
   - [x] [AuditEntry](../architecture/ARCHITECTURE.md#auditentry-e-porta-de-auditoria) e `AuditLogPort` (`AuditEntryTest`, SHR-AU-01 e 02 #1 a #4; 02 #5 e 03 são integração, junto com `V4__audit.sql`)
 - [ ] Casos de uso, **nesta ordem de implementação** (cada etapa depende da anterior; detalhes em [Próxima tarefa concreta](#próxima-tarefa-concreta)), respeitando as [dependências entre módulos](../architecture/ARCHITECTURE.md#dependências-entre-módulos-na-fase-1):
-  1. [ ] Ledger (LED-UC-04, 05, 01, 02, 03): [API pública do ledger](../architecture/ARCHITECTURE.md#api-pública-do-ledger-applicationportin). Vem primeiro porque `accounts` e `funding` chamam essa API. Feitos: LED-UC-04, 05, 01 e 02 (`PostJournalTest`, `PostJournalIntegrationTest`). Falta: LED-UC-03.
+  1. [x] Ledger (LED-UC-04, 05, 01, 02, 03): [API pública do ledger](../architecture/ARCHITECTURE.md#api-pública-do-ledger-applicationportin). Vem primeiro porque `accounts` e `funding` chamam essa API. Testes de integração por caso de uso em `ledger/application/usecase`; LED-UC-02 e 03 também com teste unitário (`PostJournalTest`, `GetLedgerBalanceTest`).
   2. [ ] Accounts (ACC-UC-04, depois 01 a 03): [abrir/consultar conta](../architecture/ARCHITECTURE.md#casos-de-uso-de-accounts). O ACC-UC-01 usa o `OpenCustomerLedgerAccountUseCase` (LED-UC-01).
   3. [ ] Funding (FUN): [funding](../architecture/ARCHITECTURE.md#funding-fictício-post-v1devfunding). Usa o ACC-UC-04 e o LED-UC-02.
 - [x] Migrations `V2__accounts.sql`, `V3__ledger.sql` nos schemas `accounts`/`ledger` com CHECKs, FKs e bloqueio de UPDATE/DELETE em entries (trigger). A `V3` cria `ledger_accounts`, `journals`, `journal_entries` e `balance_projections`, com triggers append-only em journals/entries e a projeção zerada do `SIMULATED_CASH:BRL`. Os testes de integração das constraints entram junto com os adapters.
@@ -92,9 +92,11 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 - [ ] Fazer simulações de entrevista e registrar trade-offs.
 
 ## Próxima tarefa concreta
-**Implementar os casos de uso do ledger ([API pública](../architecture/ARCHITECTURE.md#api-pública-do-ledger-applicationportin), LED-UC-01 a 05).** Domínio, migrations `V1`–`V4` e adapters de persistência estão prontos e testados. Ordem sugerida:
-1. Ledger: LED-UC-04 e LED-UC-05 (só leitura), LED-UC-01, LED-UC-02 (com os testes de rollback #3 a #7, incluindo o #4b) ✅. Próximo: LED-UC-03.
-2. `accounts`: ACC-UC-04 (`AccountStatusQuery`, interno), depois ACC-UC-01 a 03 com auditoria (SHR-AU-02 #5 e SHR-AU-03 #1/#2).
+**Implementar os casos de uso de `accounts` ([casos de uso de accounts](../architecture/ARCHITECTURE.md#casos-de-uso-de-accounts)).** Domínio, migrations `V1`–`V4`, adapters de persistência e a API pública do ledger (LED-UC-01 a 05) estão prontos e testados. Ordem sugerida:
+1. ~~Ledger: LED-UC-04 e LED-UC-05 (só leitura), LED-UC-01, LED-UC-02 (com os testes de rollback #3 a #7, incluindo o #4b) e LED-UC-03~~ ✅
+2. `accounts` (próximo): ACC-UC-04 (`AccountStatusQuery`, interno), depois ACC-UC-01 a 03 com auditoria (SHR-AU-02 #5 e SHR-AU-03 #1/#2).
+   - **Estado atual (parcial, anterior ao ledger):** já existem as portas `AccountStatusQuery`, `GetAccountQuery` e `OpenAccountUseCase`, e um `OpenAccount`. O ACC-UC-01 precisa ser **completado**, não começado: o `OpenAccount` ainda não chama o `OpenCustomerLedgerAccountUseCase` (LED-UC-01) nem grava auditoria. Nenhuma das portas tem bean nem teste de caso de uso.
+   - **Ajuste pendente:** o pacote `accounts/application/port/in/commnd` tem typo (→ `command`), e o `AccountBalanceView` está nele, mas é view: mover para `port/in/view`, como no ledger.
 3. Funding, seguindo os passos do serviço documentados na spec.
 
 Antes de escrever os testes que exigem rollback, ler [testes de rollback e dados append-only](../architecture/ARCHITECTURE.md#testes-de-rollback-e-dados-append-only): sem `@Transactional` no teste, ids aleatórios e conferência por id. Deduplicação idempotente fica para a Fase 2 (na Fase 1 o funding só valida a `Idempotency-Key`). Não antecipar Redis/Kafka/gateway externo.

@@ -440,7 +440,7 @@ Na Fase 1 também se travam as projeções com `SELECT … FOR UPDATE` em ordem 
 **Pronto quando:** `BalanceProjectionTest` cobre LED-BP-01 a 08; teste de integração com Postgres (`LedgerPersistenceIntegrationTest`) cobre LED-BP-09 e 10. ✅
 
 ### API pública do ledger (`application/port/in`)
-**Status:** ⏳ a implementar. Regras: **[BR-010 a BR-016](../domain/BUSINESS_RULES.md#ledger)**, **[BR-022](../domain/BUSINESS_RULES.md#transferências-internas)**, [ADR-0002](../adr/0002-convencao-contabil.md), [ADR-0003](../adr/0003-ciclo-de-vida-e-encerramento-de-contas.md).
+**Status:** ✅ implementada (LED-UC-01 a 05). Regras: **[BR-010 a BR-016](../domain/BUSINESS_RULES.md#ledger)**, **[BR-022](../domain/BUSINESS_RULES.md#transferências-internas)**, [ADR-0002](../adr/0002-convencao-contabil.md), [ADR-0003](../adr/0003-ciclo-de-vida-e-encerramento-de-contas.md).
 
 O ledger **não** verifica status de conta nem autorização: isso é do caso de uso que chama (ADR-0003). Ele também **não abre transação própria**: participa da transação de quem chama (`@Transactional` com propagação padrão `REQUIRED`, nunca `REQUIRES_NEW`). Assim, journal, efeito de negócio e auditoria são confirmados ou desfeitos juntos (BR-012).
 
@@ -541,6 +541,12 @@ Carregar as contas (passo 2) antes de travar (passo 3) não abre janela de corri
 | 1 | conta com `booked 10000`, `reserved 0` | `byAccountId(accountId)` | `LedgerBalanceView(accountId, BRL 10000, BRL 0, BRL 10000, asOf)` |
 | 2 | `accountId` sem conta contábil | `byAccountId` | `Optional.empty()` (o `accounts` transforma em `404`) |
 | 3 | qualquer consulta | `byAccountId` | `asOf` = instante da leitura (`Clock`). A projeção é transacional, então está correta no instante em que foi lida |
+| 4 | conta contábil existe, mas sem projeção | `byAccountId` | `IllegalStateException` (500): dado inconsistente, como no LED-UC-02 #4b. Não devolve `Optional.empty()`, que esconderia o bug como "conta não encontrada" |
+| 5 | `null` | `byAccountId` | `NullPointerException` |
+
+Passos (`@Transactional(readOnly = true)`): `LedgerAccountRepository.findByAccountId` → vazio devolve `Optional.empty()`; `BalanceProjectionRepository.findFor(account)` → vazio lança #4; montar a view com `available` vindo de `BalanceProjection.available()` (a regra `booked - reserved` é do domínio) e `asOf = clock.instant()`.
+
+**Testes:** `GetLedgerBalanceTest` (unitário: #1 a #5, incluindo `available` com `reserved > 0`) e `GetLedgerBalanceIntegrationTest` (Postgres: #1 depois de funding e com conta recém-aberta, #2, #3, #4).
 
 **Decisão:** o `asOf` é o instante da leitura, e não da última atualização, porque o `DATA_MODEL` não tem `updated_at` em `balance_projections`. Se o produto quiser "atualizado em", isso exige coluna nova.
 
@@ -564,7 +570,7 @@ Carregar as contas (passo 2) antes de travar (passo 3) não abre janela de corri
 Implementação: `LedgerAccountRepository.findByAccountId(...).map(LedgerAccount::getId)`.
 
 **Fora do escopo:** estorno pela API (o domínio já tem `Journal.reverse`; ainda não há caso de uso), extrato, holds.
-**Pronto quando:** testes de integração com Postgres cobrem LED-UC-01 a 05, incluindo o rollback de LED-UC-02 #3 a #7 (ver [testes de rollback](#testes-de-rollback-e-dados-append-only)).
+**Pronto quando:** testes de integração com Postgres cobrem LED-UC-01 a 05, incluindo o rollback de LED-UC-02 #3 a #7 (ver [testes de rollback](#testes-de-rollback-e-dados-append-only)). ✅
 
 ## Domínio do módulo `funding`
 Regras de negócio: **[BR-003](../domain/BUSINESS_RULES.md#dinheiro-e-contas)**. Contrato: [HTTP_API](../contracts/HTTP_API.md#funding-de-laboratório-fase-1-apenas-dev--test). Lançamento de referência: [ADR-0002](../adr/0002-convencao-contabil.md), seção 4.
