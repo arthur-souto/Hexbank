@@ -44,6 +44,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Especificação: docs/architecture/ARCHITECTURE.md, LED-BP-09/10 e LED-UC-01 a 04.
  * Cada teste roda numa transação revertida ao final; por isso as escritas JPA precisam de flush()
  * para que constraints, triggers e o UPDATE condicional por version cheguem ao banco.
+ * O banco é compartilhado com testes que commitam (ex.: PostJournalIntegrationTest): nunca conferir
+ * o booked absoluto do SIMULATED_CASH, só a variação ou o recálculo pelos entries.
  */
 @SpringBootTest(classes = ApiApplication.class)
 @Import(TestContainersConfiguration.class)
@@ -148,13 +150,20 @@ class LedgerPersistenceIntegrationTest {
             assertThat(cash.allowsNegativeAvailable()).isTrue();
         }
 
+        /**
+         * A V3 cria a projeção do caixa zerada. Outros testes (PostJournalIntegrationTest etc.) commitam
+         * fundings no mesmo banco, então o booked absoluto depende da ordem dos testes. Prova equivalente:
+         * booked = Σ entries do caixa só vale se a projeção nasceu em 0.
+         */
         @Test
-        void caixaSimuladoJaTemProjecaoZerada() {
+        void caixaSimuladoNasceuComProjecaoZerada() {
             BalanceProjection projection = projections.findFor(cash()).orElseThrow();
+            long cashFromEntries = count("""
+                    SELECT COALESCE(SUM(CASE side WHEN 'DEBIT' THEN minor_units ELSE -minor_units END), 0)
+                    FROM ledger.journal_entries WHERE ledger_account_id = ?""", CASH_ID.value());
 
-            assertThat(projection.getBooked()).isEqualTo(brl(0));
+            assertThat(projection.getBooked()).isEqualTo(brl(cashFromEntries));
             assertThat(projection.getReserved()).isEqualTo(brl(0));
-            assertThat(projection.getVersion()).isZero();
         }
 
         @Test
@@ -431,11 +440,13 @@ class LedgerPersistenceIntegrationTest {
         @Test
         void fundingAtualizaAsDuasProjecoes() {
             LedgerAccount customer = openCustomer();
+            Money cashBefore = projections.findFor(cash()).orElseThrow().getBooked();
 
             post(funding(customer, 10_000), cash(), customer);
 
             assertThat(projections.findFor(customer).orElseThrow().getBooked()).isEqualTo(brl(10_000));
-            assertThat(projections.findFor(cash()).orElseThrow().getBooked()).isEqualTo(brl(10_000));
+            // Caixa acumula fundings commitados por outros testes: só a variação é determinística.
+            assertThat(projections.findFor(cash()).orElseThrow().getBooked()).isEqualTo(cashBefore.plus(brl(10_000)));
         }
 
         @Test
@@ -472,6 +483,7 @@ class LedgerPersistenceIntegrationTest {
         @Test
         void saldoRecalculadoPelosEntriesBateComAProjecao() {
             LedgerAccount customer = openCustomer();
+            Money cashBefore = projections.findFor(cash()).orElseThrow().getBooked();
             post(funding(customer, 10_000), cash(), customer);
             post(funding(customer, 2_500), cash(), customer);
 
@@ -483,7 +495,9 @@ class LedgerPersistenceIntegrationTest {
                     FROM ledger.journal_entries WHERE ledger_account_id = ?""", CASH_ID.value());
 
             assertThat(projections.findFor(customer).orElseThrow().getBooked()).isEqualTo(brl(customerFromEntries)).isEqualTo(brl(12_500));
-            assertThat(projections.findFor(cash()).orElseThrow().getBooked()).isEqualTo(brl(cashFromEntries)).isEqualTo(brl(12_500));
+            assertThat(projections.findFor(cash()).orElseThrow().getBooked())
+                    .isEqualTo(brl(cashFromEntries))
+                    .isEqualTo(cashBefore.plus(brl(12_500)));
         }
 
         @Test
