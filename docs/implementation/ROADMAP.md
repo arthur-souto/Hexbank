@@ -35,7 +35,7 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
   - [x] [IdempotencyKey](../architecture/ARCHITECTURE.md#idempotencykey-shareddomain) (`IdempotencyKeyTest`, SHR-IK-01 a 03)
   - [x] [AuditEntry](../architecture/ARCHITECTURE.md#auditentry-e-porta-de-auditoria) e `AuditLogPort` (`AuditEntryTest`, SHR-AU-01 e 02 #1 a #4; 02 #5 e 03 são integração, junto com `V4__audit.sql`)
 - [ ] Casos de uso, **nesta ordem de implementação** (cada etapa depende da anterior; detalhes em [Próxima tarefa concreta](#próxima-tarefa-concreta)), respeitando as [dependências entre módulos](../architecture/ARCHITECTURE.md#dependências-entre-módulos-na-fase-1):
-  1. [ ] Ledger (LED-UC-04, 05, 01, 02, 03): [API pública do ledger](../architecture/ARCHITECTURE.md#api-pública-do-ledger-applicationportin). Vem primeiro porque `accounts` e `funding` chamam essa API.
+  1. [ ] Ledger (LED-UC-04, 05, 01, 02, 03): [API pública do ledger](../architecture/ARCHITECTURE.md#api-pública-do-ledger-applicationportin). Vem primeiro porque `accounts` e `funding` chamam essa API. Feitos: LED-UC-04, 05, 01 e 02 (`PostJournalTest`, `PostJournalIntegrationTest`). Falta: LED-UC-03.
   2. [ ] Accounts (ACC-UC-04, depois 01 a 03): [abrir/consultar conta](../architecture/ARCHITECTURE.md#casos-de-uso-de-accounts). O ACC-UC-01 usa o `OpenCustomerLedgerAccountUseCase` (LED-UC-01).
   3. [ ] Funding (FUN): [funding](../architecture/ARCHITECTURE.md#funding-fictício-post-v1devfunding). Usa o ACC-UC-04 e o LED-UC-02.
 - [x] Migrations `V2__accounts.sql`, `V3__ledger.sql` nos schemas `accounts`/`ledger` com CHECKs, FKs e bloqueio de UPDATE/DELETE em entries (trigger). A `V3` cria `ledger_accounts`, `journals`, `journal_entries` e `balance_projections`, com triggers append-only em journals/entries e a projeção zerada do `SIMULATED_CASH:BRL`. Os testes de integração das constraints entram junto com os adapters.
@@ -93,7 +93,7 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 
 ## Próxima tarefa concreta
 **Implementar os casos de uso do ledger ([API pública](../architecture/ARCHITECTURE.md#api-pública-do-ledger-applicationportin), LED-UC-01 a 05).** Domínio, migrations `V1`–`V4` e adapters de persistência estão prontos e testados. Ordem sugerida:
-1. Ledger: LED-UC-04 e LED-UC-05 (só leitura), LED-UC-01, LED-UC-02 (com os testes de rollback #3 a #7, incluindo o #4b) e LED-UC-03.
+1. Ledger: LED-UC-04 e LED-UC-05 (só leitura), LED-UC-01, LED-UC-02 (com os testes de rollback #3 a #7, incluindo o #4b) ✅. Próximo: LED-UC-03.
 2. `accounts`: ACC-UC-04 (`AccountStatusQuery`, interno), depois ACC-UC-01 a 03 com auditoria (SHR-AU-02 #5 e SHR-AU-03 #1/#2).
 3. Funding, seguindo os passos do serviço documentados na spec.
 

@@ -254,7 +254,7 @@ Uma linha do lançamento. Não tem id próprio: faz parte do `Journal`. O `id` e
 
 | Regra | Comportamento esperado |
 |---|---|
-| Moeda | moeda do `amount` = moeda da `LedgerAccount`; verificado pelo [lançamento](#led-uc-02--lançar-journal), quando a conta é carregada |
+| Moeda | moeda do `amount` = moeda da `LedgerAccount`; verificado pelo [lançamento](#led-uc-02--lançar-journal), no `BalanceProjection.apply` (passo 4), e pela FK `fk_journal_entries_account_currency` no banco |
 | Estorno | `reversed()` devolve um entry novo, com a mesma conta e o mesmo valor e o lado invertido |
 | Imutável | `record` (acessores `ledgerAccountId()`, `side()`, `amount()`), sem setters; nunca UPDATE/DELETE (BR-011) |
 | Igualdade | por valor (`equals`/`hashCode` gerados pelo `record`): dois entries com mesma conta, lado e valor são iguais |
@@ -509,12 +509,13 @@ public interface BalanceProjectionRepository {
 > **Como** caso de uso que move dinheiro (funding, depois transferência), **quero** lançar um journal balanceado e atualizar os saldos de uma vez, **para** que nunca exista lançamento sem saldo ou saldo sem lançamento (BR-012, BR-013).
 
 Passos, todos na transação de quem chama:
-1. Gerar `JournalId` e `createdAt` (`Clock`).
-2. Carregar as `LedgerAccount`s (`LedgerAccountRepository.findAllById`); faltou alguma → LED-UC-02 #4; conferir que a moeda de cada entry = moeda da sua conta.
-3. Travar as projeções dessas contas em **ordem crescente de `LedgerAccountId`** (`BalanceProjectionRepository.lockForUpdate`, `SELECT … FOR UPDATE … ORDER BY`). Ordem estável evita deadlock (BR-022). A ordem é a do Postgres para `uuid`, a mesma em todas as transações.
-4. Criar o `Journal` com `Journal.post(...)` (valida BR-010).
-5. Para cada entry, `projection.apply(entry, account)` (valida BR-016).
-6. Gravar journal + entries e as projeções (LED-BP-09). Devolver o `JournalId`.
+1. Gerar `JournalId` e `createdAt` (`Clock`) e criar o `Journal` com `Journal.post(...)` (valida BR-010: balanceamento, mínimo de 2 entries, conta repetida, moeda única, nulos).
+2. Carregar as `LedgerAccount`s dos entries do journal (`LedgerAccountRepository.findAllById`); faltou alguma → LED-UC-02 #4.
+3. Travar as projeções dessas contas em **ordem crescente de `LedgerAccountId`** (`BalanceProjectionRepository.lockForUpdate`, `SELECT … FOR UPDATE … ORDER BY`). Ordem estável evita deadlock (BR-022). A ordem é a do Postgres para `uuid`, a mesma em todas as transações. Faltou alguma projeção → LED-UC-02 #4b.
+4. Para cada entry, `projection.apply(entry, account)`, que devolve uma projeção nova (valida BR-016 e a moeda: entry ≠ moeda da conta → LED-UC-02 #5).
+5. Gravar journal + entries e depois as projeções novas (LED-BP-09). Devolver o `JournalId`.
+
+**Decisão:** o `Journal` é criado **antes** de ir ao banco, para que um journal inválido (#3) falhe sem carregar contas nem pegar lock. A moeda do entry é conferida no `apply` (passo 4), e não ao carregar as contas: a projeção é montada com a moeda da conta, então o resultado é o mesmo, e o banco ainda garante pela FK `fk_journal_entries_account_currency`.
 
 Carregar as contas (passo 2) antes de travar (passo 3) não abre janela de corrida: `ledger_accounts` nunca muda depois de criada. E o `lockForUpdate` precisa delas, porque `balance_projections` não guarda moeda.
 
@@ -529,6 +530,8 @@ Carregar as contas (passo 2) antes de travar (passo 3) não abre janela de corri
 | 6 | débito que deixa cliente negativo | `post` | `InsufficientFundsException` (409); nada gravado, nem as outras projeções |
 | 7 | `(FUNDING, f1)` já lançado | `post` de novo com `f1` | violação de `UNIQUE` → exceção (500); rollback. Na Fase 1 o funding sempre gera `referenceId` novo, então isso só acontece por bug |
 | 8 | dois entries com contas `L2` e `L1` | `post` | as projeções são travadas na ordem `L1`, `L2` (teste de integração ou verificação do repositório) |
+
+**Testes:** `PostJournalTest` (unitário, portas mockadas: orquestração, #3, #4, #4b, #6) e `PostJournalIntegrationTest` (Postgres: #1, #2, #3, #4, #4b, #6, #7 e a falha no `update` depois de o journal ser gravado, que prova o rollback do journal junto, BR-012). O #8 está no `LedgerPersistenceIntegrationTest`. O #5 não é testável enquanto `InstanceCurrency` só tiver `BRL`.
 
 #### LED-UC-03 — Consultar saldo
 > **Como** módulo `accounts`, **quero** ler o saldo de uma conta pelo seu `accountId`, **para** responder `GET /v1/accounts/{id}/balance` sem calcular nada.

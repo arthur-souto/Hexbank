@@ -3,13 +3,18 @@ package com.hexbank.ledger.config;
 import com.hexbank.ledger.application.port.in.FindCustomerLedgerAccountQuery;
 import com.hexbank.ledger.application.port.in.FindInstitutionalAccountQuery;
 import com.hexbank.ledger.application.port.in.OpenCustomerLedgerAccountUseCase;
+import com.hexbank.ledger.application.port.in.PostJournalUseCase;
 import com.hexbank.ledger.application.port.out.BalanceProjectionRepository;
+import com.hexbank.ledger.application.port.out.JournalRepository;
 import com.hexbank.ledger.application.port.out.LedgerAccountRepository;
 import com.hexbank.ledger.application.usecase.FindCustomerLedgerAccount;
 import com.hexbank.ledger.application.usecase.FindInstitutionalAccount;
 import com.hexbank.ledger.application.usecase.OpenCustomerLedgerAccount;
+import com.hexbank.ledger.application.usecase.PostJournal;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.time.Clock;
 
 @Configuration
 public class LedgerUseCaseConfig {
@@ -27,5 +32,10 @@ public class LedgerUseCaseConfig {
     @Bean
     public OpenCustomerLedgerAccountUseCase openCustomerLedgerAccountUseCase(LedgerAccountRepository ledgerAccountRepository, BalanceProjectionRepository balanceProjectionRepository) {
         return new OpenCustomerLedgerAccount(ledgerAccountRepository, balanceProjectionRepository);
+    }
+
+    @Bean
+    public PostJournalUseCase postJournalUseCase(Clock clock, JournalRepository journalRepository, LedgerAccountRepository ledgerAccountRepository, BalanceProjectionRepository balanceProjectionRepository) {
+        return new PostJournal(clock, journalRepository, ledgerAccountRepository, balanceProjectionRepository);
     }
 }
