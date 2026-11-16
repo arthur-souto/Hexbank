@@ -96,7 +96,7 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 1. ~~Ledger: LED-UC-04 e LED-UC-05 (só leitura), LED-UC-01, LED-UC-02 (com os testes de rollback #3 a #7, incluindo o #4b) e LED-UC-03~~ ✅
 2. `accounts` (próximo): ACC-UC-04 (`AccountStatusQuery`, interno), depois ACC-UC-01 a 03 com auditoria (SHR-AU-02 #5 e SHR-AU-03 #1/#2).
    - **Estado atual (parcial, anterior ao ledger):** já existem as portas `AccountStatusQuery`, `GetAccountQuery` e `OpenAccountUseCase`, e um `OpenAccount`. O ACC-UC-01 precisa ser **completado**, não começado: o `OpenAccount` ainda não chama o `OpenCustomerLedgerAccountUseCase` (LED-UC-01) nem grava auditoria. Nenhuma das portas tem bean nem teste de caso de uso.
-   - **Ajuste pendente:** o pacote `accounts/application/port/in/commnd` tem typo (→ `command`), e o `AccountBalanceView` está nele, mas é view: mover para `port/in/view`, como no ledger.
+   - ~~**Ajuste pendente:** o pacote `accounts/application/port/in/commnd` tem typo (→ `command`), e o `AccountBalanceView` está nele, mas é view: mover para `port/in/view`, como no ledger.~~ Resolvido.
 3. Funding, seguindo os passos do serviço documentados na spec.
 
 Antes de escrever os testes que exigem rollback, ler [testes de rollback e dados append-only](../architecture/ARCHITECTURE.md#testes-de-rollback-e-dados-append-only): sem `@Transactional` no teste, ids aleatórios e conferência por id. Deduplicação idempotente fica para a Fase 2 (na Fase 1 o funding só valida a `Idempotency-Key`). Não antecipar Redis/Kafka/gateway externo.

@@ -1,4 +1,4 @@
-package com.hexbank.accounts.application.port.in.commnd;
+package com.hexbank.accounts.application.port.in.view;
 
 import com.hexbank.shared.domain.Money;
 

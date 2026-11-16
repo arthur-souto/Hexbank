@@ -1,6 +1,6 @@
 package com.hexbank.accounts.application.port.in;
 
-import com.hexbank.accounts.application.port.in.commnd.AccountBalanceView;
+import com.hexbank.accounts.application.port.in.view.AccountBalanceView;
 import com.hexbank.accounts.domain.Account;
 import com.hexbank.accounts.domain.AccountId;
 import com.hexbank.identity.domain.PrincipalId;

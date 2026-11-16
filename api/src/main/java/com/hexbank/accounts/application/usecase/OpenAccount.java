@@ -1,7 +1,7 @@
 package com.hexbank.accounts.application.usecase;
 
 import com.hexbank.accounts.application.port.in.OpenAccountUseCase;
-import com.hexbank.accounts.application.port.in.commnd.OpenAccountCommand;
+import com.hexbank.accounts.application.port.in.command.OpenAccountCommand;
 import com.hexbank.accounts.application.port.out.AccountRepository;
 import com.hexbank.accounts.domain.Account;
 import com.hexbank.accounts.domain.AccountId;
