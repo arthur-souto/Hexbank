@@ -20,7 +20,7 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 - `ApiApplication` vive em `com.hexbank.bootstrap` com scan explícito de `com.hexbank` (componentes, entidades e repositórios); todo `@SpringBootTest` declara `classes = ApiApplication.class`.
 - ~~Pacote `com.hexbank.api` está vazio e não consta no ARCHITECTURE.md: definir propósito ou remover.~~ Resolvido: pacote removido (commit `896d82a`).
 - Controller de identidade (`GET /v1/me`) ainda não existe; resolver o principal nos controllers via `@AuthenticationPrincipal PrincipalId`.
-- Ainda não há tratamento de `MethodArgumentNotValidException` com lista de campos: adicionar junto do primeiro DTO com Bean Validation (`spring-boot-starter-validation`).
+- ~~Ainda não há tratamento de `MethodArgumentNotValidException` com lista de campos~~ Resolvido junto do `OpenAccountRequest`: `spring-boot-starter-validation` adicionado e handler devolve `errors: [{field, message}]`.
 
 ## Fase 1 — Contas + Ledger + funding fictício
 - [x] Registrar **ADR-0002 (convenção contábil)** antes do código ([`docs/adr/0002-convencao-contabil.md`](../adr/0002-convencao-contabil.md), status: aceito): natureza das contas (ativo/passivo), sinal de débito/crédito, contas de contrapartida do funding.
@@ -40,12 +40,12 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
   3. [ ] Funding (FUN): [funding](../architecture/ARCHITECTURE.md#funding-fictício-post-v1devfunding). Usa o ACC-UC-04 e o LED-UC-02.
 - [x] Migrations `V2__accounts.sql`, `V3__ledger.sql` nos schemas `accounts`/`ledger` com CHECKs, FKs e bloqueio de UPDATE/DELETE em entries (trigger). A `V3` cria `ledger_accounts`, `journals`, `journal_entries` e `balance_projections`, com triggers append-only em journals/entries e a projeção zerada do `SIMULATED_CASH:BRL`. Os testes de integração das constraints entram junto com os adapters.
 - [x] Adaptadores `adapter/out/persistence` (JPA) separados das entidades de domínio: `Account`, `LedgerAccount`, `Journal` + entries, `BalanceProjection` (lock ordenado + `@Version`) e `AuditLogPort`. Pacotes padronizados em todos os módulos: adapters na raiz de `persistence/`, `entity/` e `jpa/`. Escritas com `Propagation.MANDATORY`. Testes: `LedgerPersistenceIntegrationTest` (LED-BP-09/10, LED-UC-01 #2, LED-UC-02 #7 e #8, LED-UC-04 #1, constraints e triggers da `V3`) e `AuditLogPersistenceIntegrationTest` (SHR-AU-03 #3, constraints da `V4`).
-- [ ] Endpoints `POST /v1/accounts`, `GET /v1/accounts/{id}`, `GET /v1/accounts/{id}/balance` com owner vindo do `PrincipalId`.
+- [x] Endpoints `POST /v1/accounts`, `GET /v1/accounts/{id}`, `GET /v1/accounts/{id}/balance` com owner vindo do `PrincipalId`. `AccountController` + `AccountExceptionHandler` (404/409), Swagger documentado; `AccountControllerTest` (`@WebMvcTest`, 14 testes).
 - [ ] `POST /v1/dev/funding` com `@Profile({"dev","test"})` no controller **e** `TEST_ADMIN` (já exigido em `SecurityConfig`).
 - [ ] Funding exige `Idempotency-Key` desde já (ausente ou fora de 16–128 caracteres → `400 INVALID_REQUEST`), para o contrato HTTP não mudar na Fase 2. **Sem deduplicação na Fase 1**: repetir a chamada gera novo journal (limitação consciente, só `dev`/`test`).
 - [ ] Materializar projeção de saldo na mesma transação dos entries.
 - [ ] `audit_log` mínimo ([ADR-0004](../adr/0004-retencao-de-auditoria.md)): ~~migration `V4__audit.sql` no schema `audit` com bloqueio de UPDATE/DELETE~~ e ~~adapter da `AuditLogPort`~~ (feitos); registros `ACCOUNT_CREATED` e `FUNDING_POSTED` gravados na mesma transação do caso de uso; teste de integração confirma o registro e a ausência de dados sensíveis.
-- [ ] Novos `code`s em `ErrorCodes` ([lista da Fase 1](../architecture/ARCHITECTURE.md#códigos-de-erro-novos-na-fase-1): `ACCOUNT_NOT_FOUND`, `ACCOUNT_NOT_ACTIVE`, `INVALID_STATUS_TRANSITION`, `INSUFFICIENT_FUNDS`) + documentação no Swagger (`@Operation`, `@ApiResponse`).
+- [ ] Novos `code`s ([lista da Fase 1](../architecture/ARCHITECTURE.md#códigos-de-erro-novos-na-fase-1): `ACCOUNT_NOT_FOUND`, `ACCOUNT_NOT_ACTIVE`, `INVALID_STATUS_TRANSITION`, `INSUFFICIENT_FUNDS`) + documentação no Swagger (`@Operation`, `@ApiResponse`). Feito para accounts (enum `ErrorsCodes` em `shared/domain`, usado por `AccountExceptionHandler`; Swagger de accounts); falta o mapeamento de `INSUFFICIENT_FUNDS` e o Swagger do funding.
 - [ ] Testes: unitários de domínio, `@WebMvcTest` + `spring-security-test` para contrato HTTP, integração Postgres para invariantes.
 **Pronto quando:** totais contábeis fecham e projeção coincide com entries; funding tem contrapartida; criação de conta e funding deixam registro no `audit_log`.
 
@@ -92,16 +92,13 @@ Cada fase depende da anterior; os critérios de pronto são verificáveis. **Nã
 - [ ] Fazer simulações de entrevista e registrar trade-offs.
 
 ## Próxima tarefa concreta
-**Implementar os endpoints HTTP de `accounts`** ([contrato](../contracts/HTTP_API.md#criar-conta-fase-1), cenários HTTP do ACC-UC-01 a 03). Domínio, migrations `V1`–`V4`, adapters, a API pública do ledger e os casos de uso de `accounts` estão prontos e testados.
+**Implementar o funding fictício** (`POST /v1/dev/funding`, [spec FUN](../architecture/ARCHITECTURE.md#funding-fictício-post-v1devfunding)). Domínio, migrations `V1`–`V4`, adapters, API pública do ledger, casos de uso e endpoints HTTP de `accounts` estão prontos e testados.
 1. ~~Ledger: LED-UC-04 e LED-UC-05 (só leitura), LED-UC-01, LED-UC-02 (com os testes de rollback #3 a #7, incluindo o #4b) e LED-UC-03~~ ✅
-2. ~~Casos de uso de `accounts`~~ ✅: ACC-UC-04 (`CheckAccountActive`), ACC-UC-02/03 (`GetAccount`), ACC-UC-01 (`OpenAccount` com ledger e auditoria; `OpenAccountIntegrationTest` cobre #2, #6 e SHR-AU-03 #1/#2).
-3. **Endpoints de `accounts` (próximo, em andamento):** `POST /v1/accounts`, `GET /v1/accounts/{id}`, `GET /v1/accounts/{id}/balance`.
-   - **Controller:** trocar `@RestController("/v1/accounts")` (só nomeia o bean) por `@RequestMapping("/v1/accounts")`; injetar as portas (`OpenAccountUseCase`, `GetAccountQuery`); principal via `@AuthenticationPrincipal PrincipalId` (único dono, BR-004); `requestId` via `RequestIdFilter.currentRequestId(request)` no `OpenAccountCommand`; path variable `UUID` → `AccountId`.
-   - **DTOs:** `OpenAccountRequest.currency` como `InstanceCurrency` (`"USD"` → Jackson → `400`); moeda ausente com Bean Validation (`spring-boot-starter-validation`, `@NotNull` + `@Valid`; pendência herdada da Fase 0). Responses `AccountResponse(id, currency, status)` e `AccountBalanceResponse` em minor units (`long`), sem expor `Money` (BR-052).
-   - **Erros de negócio:** `ApiExceptionHandler` ainda não trata `BusinessException` (`AccountNotFoundException` vira 500 hoje). Adicionar os `code`s da Fase 1 em `ErrorCodes`. **Decisão pendente:** (a) `@RestControllerAdvice` próprio em `accounts/adapter/in/http` (recomendado; precisa de `@Order` antes do global, que captura `Exception`, e de reaproveitar o `respond(...)`) ou (b) `code` na `BusinessException`. Mapear direto no handler de `shared` cria `shared → accounts` e quebra o `ArchitectureTest`. `detail` do 404 com texto fixo, sem o id.
-   - **Id não-UUID:** `MethodArgumentTypeMismatchException` não é `ErrorResponse` e cai no 500; precisa de handler genérico em `shared` → `400 INVALID_REQUEST` (ACC-UC-02 #5).
-   - **Swagger:** `@Operation`/`@ApiResponse` (201/400/401/404).
-   - **Testes:** `AccountControllerTest` (`@WebMvcTest` + `spring-security-test`, portas mockadas): ACC-UC-01 #1, #3, #4, #7; ACC-UC-02 #1 a #5; ACC-UC-03 #1 a #3; `requestId` e principal chegando ao command.
-4. Funding, seguindo os passos do serviço documentados na spec.
+2. ~~Casos de uso de `accounts`~~ ✅: ACC-UC-04 (`CheckAccountActive`), ACC-UC-02/03 (`GetAccount`), ACC-UC-01 (`OpenAccount` com ledger e auditoria).
+3. ~~Endpoints de `accounts`~~ ✅: `POST /v1/accounts`, `GET /v1/accounts/{id}`, `GET /v1/accounts/{id}/balance`.
+   - Erros de negócio tratados por `@RestControllerAdvice` próprio em `accounts/adapter/in/http/handler` (`@Order(HIGHEST_PRECEDENCE)`), reaproveitando `ProblemResponses.respond(...)` de `shared` (sem dependência `shared → accounts`). `detail` do 404 com texto fixo, sem o id.
+   - `ApiExceptionHandler` trata `MethodArgumentNotValidException` (400 com `errors`) e `MethodArgumentTypeMismatchException` (400 para id não-UUID).
+   - `AccountControllerTest` cobre ACC-UC-01 #1, #3, #4, #7; ACC-UC-02 #1 a #5; ACC-UC-03 #1 e #3; principal e `requestId` chegando ao command.
+4. **Funding (próximo):** seguir os passos do serviço documentados na spec. Usa o ACC-UC-04 (`AccountStatusQuery`) e o LED-UC-02 (`PostJournal`); exige `Idempotency-Key` (16–128 caracteres, sem deduplicação na Fase 1); grava a auditoria `FUNDING_POSTED` na mesma transação; controller com `@Profile({"dev","test"})` **e** `TEST_ADMIN`.
 
 Antes de escrever os testes que exigem rollback, ler [testes de rollback e dados append-only](../architecture/ARCHITECTURE.md#testes-de-rollback-e-dados-append-only): sem `@Transactional` no teste, ids aleatórios e conferência por id. Deduplicação idempotente fica para a Fase 2 (na Fase 1 o funding só valida a `Idempotency-Key`). Não antecipar Redis/Kafka/gateway externo.
